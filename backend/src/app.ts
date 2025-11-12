@@ -10,9 +10,25 @@ export const createApp = () => {
   const app = express()
 
   // CORS must come before helmet for Cloud Run
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://192.168.31.169:5173',
+    env.clientOrigin,
+  ].filter(Boolean)
+
   app.use(
     cors({
-      origin: env.clientOrigin ?? '*',
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true)
+        
+        // Check if origin is in allowed list or if clientOrigin is wildcard
+        if (env.clientOrigin === '*' || allowedOrigins.includes(origin)) {
+          return callback(null, true)
+        }
+        
+        callback(new Error('Not allowed by CORS'))
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],

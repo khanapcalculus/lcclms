@@ -11,10 +11,23 @@ const start = async () => {
   const app = createApp()
   const httpServer = http.createServer(app)
 
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://192.168.31.169:5173',
+    env.clientOrigin,
+  ].filter(Boolean)
+
   const io = new Server(httpServer, {
     cors: {
-      origin: env.clientOrigin ?? '*',
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true)
+        if (env.clientOrigin === '*' || allowedOrigins.includes(origin)) {
+          return callback(null, true)
+        }
+        callback(new Error('Not allowed by CORS'))
+      },
       credentials: true,
+      methods: ['GET', 'POST'],
     },
   })
 
