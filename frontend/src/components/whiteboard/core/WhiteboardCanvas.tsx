@@ -147,7 +147,7 @@ export const WhiteboardCanvas = ({
       selection: true,
       preserveObjectStacking: true,
       enableRetinaScaling: true,
-      renderOnAddRemove: false, // Optimize rendering
+      renderOnAddRemove: false,
     })
 
     fabricCanvas.freeDrawingBrush = new fabric.PencilBrush(fabricCanvas)
@@ -155,10 +155,6 @@ export const WhiteboardCanvas = ({
       fabricCanvas.freeDrawingBrush.color = strokeColor
       fabricCanvas.freeDrawingBrush.width = strokeWidth
     }
-    
-    // Optimize for touch/stylus devices
-    fabricCanvas.enablePointerEvents = true
-    fabricCanvas.allowTouchScrolling = false
 
     fabricCanvas.setDimensions({
       width: containerRef.current.clientWidth,
@@ -600,7 +596,11 @@ export const WhiteboardCanvas = ({
       <div className={`pointer-events-none absolute inset-0 ${spectrumOverlayClass} mix-blend-screen`}></div>
       <div className={`pointer-events-none absolute inset-0 ${haloOverlayClass} opacity-90`}></div>
       <div className={`pointer-events-none absolute inset-0 ${shadeOverlayClass}`}></div>
-      <canvas ref={canvasElementRef} className="relative z-10 h-full w-full" />
+      <canvas 
+        ref={canvasElementRef} 
+        className="relative z-10 h-full w-full touch-none" 
+        style={{ touchAction: 'none' }}
+      />
 
       <div className="pointer-events-none absolute inset-0 opacity-50 mix-blend-soft-light">
         <div
