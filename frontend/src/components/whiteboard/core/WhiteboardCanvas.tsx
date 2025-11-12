@@ -154,7 +154,6 @@ export const WhiteboardCanvas = ({
     if (fabricCanvas.freeDrawingBrush) {
       fabricCanvas.freeDrawingBrush.color = strokeColor
       fabricCanvas.freeDrawingBrush.width = strokeWidth
-      fabricCanvas.freeDrawingBrush.limitedToCanvasSize = true
     }
     
     // Optimize for touch/stylus devices
