@@ -9,6 +9,7 @@ import { WhiteboardCanvas } from './core/WhiteboardCanvas'
 type WhiteboardShellProps = {
   theme: AppTheme
   onToggleTheme: () => void
+  sessionId?: string
   participants?: PresenceEntry[]
   currentUserId?: string
   emitCursorMove?: (payload: { x: number; y: number }) => void
@@ -30,6 +31,7 @@ type WhiteboardShellProps = {
 export const WhiteboardShell = ({
   theme,
   onToggleTheme,
+  sessionId,
   participants,
   currentUserId,
   emitCursorMove,
@@ -116,6 +118,7 @@ export const WhiteboardShell = ({
         <div className={`absolute inset-0 -z-10 ${auraClass} blur-3xl`}></div>
         <WhiteboardCanvas
           theme={theme}
+          sessionId={sessionId}
           participants={participants}
           currentUserId={currentUserId}
           emitCursorMove={emitCursorMove}

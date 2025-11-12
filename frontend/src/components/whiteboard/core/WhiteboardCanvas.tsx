@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AppTheme } from '../../../App'
 import type { PresenceEntry } from '../../../hooks/useSessionPresence'
 import { useWhiteboardStore } from '../../../store/whiteboardStore'
+import { canvasService } from '../../../services/canvasService'
 
 type FabricObject = fabric.Object | fabric.Line | fabric.Ellipse | fabric.Rect
 type CanvasSnapshot = ReturnType<fabric.Canvas['toJSON']>
@@ -16,6 +17,7 @@ type RemoteCursor = {
 
 type WhiteboardCanvasProps = {
   theme: AppTheme
+  sessionId?: string
   participants?: PresenceEntry[]
   currentUserId?: string
   emitCursorMove?: (payload: { x: number; y: number }) => void
@@ -53,6 +55,7 @@ configureFabricDefaults()
 
 export const WhiteboardCanvas = ({
   theme,
+  sessionId,
   participants,
   currentUserId,
   emitCursorMove,
@@ -143,18 +146,41 @@ export const WhiteboardCanvas = ({
       backgroundColor: 'rgba(248, 250, 252, 0.28)',
       selection: true,
       preserveObjectStacking: true,
+      enableRetinaScaling: true,
+      renderOnAddRemove: false, // Optimize rendering
     })
 
     fabricCanvas.freeDrawingBrush = new fabric.PencilBrush(fabricCanvas)
     if (fabricCanvas.freeDrawingBrush) {
       fabricCanvas.freeDrawingBrush.color = strokeColor
       fabricCanvas.freeDrawingBrush.width = strokeWidth
+      fabricCanvas.freeDrawingBrush.limitedToCanvasSize = true
     }
+    
+    // Optimize for touch/stylus devices
+    fabricCanvas.enablePointerEvents = true
+    fabricCanvas.allowTouchScrolling = false
 
     fabricCanvas.setDimensions({
       width: containerRef.current.clientWidth,
       height: containerRef.current.clientHeight,
     })
+
+    // Load saved canvas state if sessionId exists
+    if (sessionId) {
+      canvasService
+        .getCanvasState(sessionId)
+        .then(({ canvasData }) => {
+          if (canvasData) {
+            fabricCanvas.loadFromJSON(canvasData as CanvasSnapshot, () => {
+              fabricCanvas.requestRenderAll()
+            })
+          }
+        })
+        .catch((err) => {
+          console.warn('Could not load saved canvas:', err)
+        })
+    }
 
     fabricCanvas.renderAll()
     setCanvas(fabricCanvas)
@@ -377,6 +403,14 @@ export const WhiteboardCanvas = ({
     const broadcast = () => {
       if (isApplyingRemoteRef.current) return
       emitSnapshot()
+      
+      // Auto-save to database if sessionId exists
+      if (sessionId) {
+        const canvasData = canvas.toJSON()
+        canvasService.saveCanvasState(sessionId, canvasData).catch((err) => {
+          console.warn('Could not save canvas:', err)
+        })
+      }
     }
 
     canvas.on('path:created', broadcast)
@@ -390,7 +424,7 @@ export const WhiteboardCanvas = ({
       canvas.off('object:modified', broadcast)
       canvas.off('object:removed', broadcast)
     }
-  }, [canvas, emitSnapshot])
+  }, [canvas, emitSnapshot, sessionId])
 
   useEffect(() => {
     if (!canvas || !subscribeWhiteboardOperation) return
