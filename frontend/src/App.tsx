@@ -14,6 +14,7 @@ export type AppTheme = 'dark' | 'light'
 
 function App() {
   const [theme, setTheme] = useState<AppTheme>('dark')
+  
   useEffect(() => {
     const root = document.documentElement
     const body = document.body

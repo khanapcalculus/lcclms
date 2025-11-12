@@ -24,6 +24,17 @@ export async function http<T>(
   })
 
   if (!response.ok) {
+    // Handle 401 Unauthorized - token expired or invalid
+    if (response.status === 401 && !options.skipAuth) {
+      const { clearAuth } = useAuthStore.getState()
+      clearAuth()
+      // Redirect to login if not already there
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        window.location.href = '/login'
+      }
+      throw new Error('Session expired. Please login again.')
+    }
+    
     let message = response.statusText
     try {
       const data = await response.json()
