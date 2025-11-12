@@ -1,4 +1,4 @@
-import { Eraser, Redo, Trash2, Undo } from 'lucide-react'
+import { Redo, Trash2, Undo } from 'lucide-react'
 import type { AppTheme } from '../../../App'
 
 type CanvasActionsProps = {
