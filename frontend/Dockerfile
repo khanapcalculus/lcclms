@@ -12,6 +12,10 @@ RUN npm ci
 # Copy source code and config files
 COPY . .
 
+# Set build-time environment variables
+ENV VITE_API_BASE_URL=https://lcclms-19941050683.us-central1.run.app
+ENV VITE_SOCKET_URL=https://lcclms-19941050683.us-central1.run.app
+
 # Build the app
 RUN npm run build
 
