@@ -40,15 +40,15 @@ export const DashboardLayout = ({ theme, onToggleTheme, children }: DashboardLay
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.12),transparent_55%),radial-gradient(circle_at_80%_80%,rgba(251,191,36,0.08),transparent_50%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.15] mix-blend-overlay [background-image:linear-gradient(90deg,rgba(148,163,184,0.15)_1px,transparent_1px),linear-gradient(0deg,rgba(148,163,184,0.15)_1px,transparent_1px)] [background-size:48px_48px]" />
 
-      <header className="relative z-10 flex items-center justify-between border-b border-white/8 bg-white/5 px-8 py-4 backdrop-blur-2xl">
-        <div className="flex items-center gap-6">
-          <img src={logoImage} alt="LCC Logo" className="h-10 w-auto" />
-          <nav className="flex items-center gap-2">
+      <header className="relative z-10 flex items-center justify-between border-b border-white/8 bg-white/5 px-4 py-3 backdrop-blur-2xl sm:px-6 sm:py-4 md:px-8">
+        <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
+          <img src={logoImage} alt="LCC Logo" className="h-8 w-auto sm:h-10" />
+          <nav className="flex items-center gap-1 sm:gap-2">
             {filteredLinks.map((link) => (
               <Link
                 key={link.to}
                 to={link.to}
-                className={`rounded-2xl px-4 py-2 text-sm font-medium transition ${
+                className={`rounded-xl px-2 py-1.5 text-xs font-medium transition sm:rounded-2xl sm:px-4 sm:py-2 sm:text-sm ${
                   location.pathname.startsWith(link.to)
                     ? theme === 'dark'
                       ? 'bg-sky-500/20 text-sky-200 shadow-lg ring-1 ring-sky-400/50'
@@ -64,30 +64,30 @@ export const DashboardLayout = ({ theme, onToggleTheme, children }: DashboardLay
           </nav>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <button
             onClick={onToggleTheme}
-            className={`flex h-10 w-10 items-center justify-center rounded-2xl border transition ${
+            className={`flex h-8 w-8 items-center justify-center rounded-xl border transition sm:h-10 sm:w-10 sm:rounded-2xl ${
               theme === 'dark'
                 ? 'border-white/15 bg-white/8 text-slate-100 hover:bg-white/12'
                 : 'border-slate-300/70 bg-white/80 text-slate-700 hover:bg-white'
             }`}
             title="Toggle theme"
           >
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === 'dark' ? <Sun className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <Moon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
           </button>
 
           <div
-            className={`flex items-center gap-3 rounded-2xl border px-4 py-2 ${
+            className={`flex items-center gap-2 rounded-xl border px-2 py-1.5 sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-2 ${
               theme === 'dark'
                 ? 'border-white/10 bg-white/5'
                 : 'border-slate-300/70 bg-white/80'
             }`}
           >
-            <div className="flex flex-col text-right text-xs">
+            <div className="hidden flex-col text-right text-[10px] sm:flex sm:text-xs">
               <span className="font-semibold">{user?.displayName}</span>
               <span
-                className={`text-[10px] uppercase tracking-wider ${
+                className={`text-[9px] uppercase tracking-wider sm:text-[10px] ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}
               >
@@ -96,20 +96,20 @@ export const DashboardLayout = ({ theme, onToggleTheme, children }: DashboardLay
             </div>
             <button
               onClick={handleLogout}
-              className={`flex h-8 w-8 items-center justify-center rounded-xl transition ${
+              className={`flex h-7 w-7 items-center justify-center rounded-lg transition sm:h-8 sm:w-8 sm:rounded-xl ${
                 theme === 'dark'
                   ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
                   : 'bg-rose-500/15 text-rose-700 hover:bg-rose-500/25'
               }`}
               title="Logout"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto w-full max-w-7xl px-8 py-10">{children}</main>
+      <main className="relative z-10 mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-10">{children}</main>
     </div>
   )
 }
