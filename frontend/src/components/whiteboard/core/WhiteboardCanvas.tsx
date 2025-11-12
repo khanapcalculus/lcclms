@@ -34,6 +34,10 @@ type WhiteboardCanvasProps = {
   subscribeWhiteboardOperation?: (
     handler: (payload: { userId: string; state: unknown }) => void
   ) => () => void
+  onUndo?: (handler: () => void) => void
+  onRedo?: (handler: () => void) => void
+  onClear?: (handler: () => void) => void
+  onHistoryChange?: (state: { canUndo: boolean; canRedo: boolean }) => void
 }
 
 const roleColorMap: Record<PresenceEntry['role'], string> = {
@@ -62,6 +66,10 @@ export const WhiteboardCanvas = ({
   subscribeCursorMove,
   emitWhiteboardOperation,
   subscribeWhiteboardOperation,
+  onUndo,
+  onRedo,
+  onClear,
+  onHistoryChange,
 }: WhiteboardCanvasProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasElementRef = useRef<HTMLCanvasElement>(null)
@@ -83,6 +91,12 @@ export const WhiteboardCanvas = ({
   const isApplyingRemoteRef = useRef(false)
   const lastCursorEmitRef = useRef(0)
   const [remoteCursors, setRemoteCursors] = useState<Record<string, RemoteCursor>>({})
+  
+  // Undo/Redo history
+  const historyRef = useRef<CanvasSnapshot[]>([])
+  const historyIndexRef = useRef(-1)
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
 
   const broadcastSnapshot = useMemo(() => {
     if (!emitWhiteboardOperation) return undefined
@@ -94,6 +108,85 @@ export const WhiteboardCanvas = ({
     const snapshot = canvas.toJSON()
     broadcastSnapshot(snapshot)
   }, [canvas, broadcastSnapshot])
+
+  const saveToHistory = useCallback(() => {
+    if (!canvas) return
+    const snapshot = canvas.toJSON()
+    
+    // Remove any redo history when new action is performed
+    historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1)
+    
+    // Add new snapshot
+    historyRef.current.push(snapshot)
+    historyIndexRef.current = historyRef.current.length - 1
+    
+    // Limit history to 50 steps
+    if (historyRef.current.length > 50) {
+      historyRef.current.shift()
+      historyIndexRef.current--
+    }
+    
+    setCanUndo(historyIndexRef.current > 0)
+    setCanRedo(false)
+  }, [canvas])
+
+  const handleUndo = useCallback(() => {
+    if (!canvas || historyIndexRef.current <= 0) return
+    
+    historyIndexRef.current--
+    const snapshot = historyRef.current[historyIndexRef.current]
+    
+    if (snapshot) {
+      isApplyingRemoteRef.current = true
+      canvas.loadFromJSON(snapshot, () => {
+        isApplyingRemoteRef.current = false
+        canvas.requestRenderAll()
+        setCanUndo(historyIndexRef.current > 0)
+        setCanRedo(historyIndexRef.current < historyRef.current.length - 1)
+      })
+    }
+  }, [canvas])
+
+  const handleRedo = useCallback(() => {
+    if (!canvas || historyIndexRef.current >= historyRef.current.length - 1) return
+    
+    historyIndexRef.current++
+    const snapshot = historyRef.current[historyIndexRef.current]
+    
+    if (snapshot) {
+      isApplyingRemoteRef.current = true
+      canvas.loadFromJSON(snapshot, () => {
+        isApplyingRemoteRef.current = false
+        canvas.requestRenderAll()
+        setCanUndo(historyIndexRef.current > 0)
+        setCanRedo(historyIndexRef.current < historyRef.current.length - 1)
+      })
+    }
+  }, [canvas])
+
+  const handleClear = useCallback(() => {
+    if (!canvas) return
+    
+    if (confirm('Are you sure you want to clear the entire canvas? This cannot be undone.')) {
+      canvas.clear()
+      canvas.backgroundColor = 'rgba(248, 250, 252, 0.28)'
+      canvas.requestRenderAll()
+      saveToHistory()
+      emitSnapshot()
+    }
+  }, [canvas, saveToHistory, emitSnapshot])
+
+  // Expose handlers to parent
+  useEffect(() => {
+    onUndo?.(handleUndo)
+    onRedo?.(handleRedo)
+    onClear?.(handleClear)
+  }, [handleUndo, handleRedo, handleClear, onUndo, onRedo, onClear])
+
+  // Notify parent of history state changes
+  useEffect(() => {
+    onHistoryChange?.({ canUndo, canRedo })
+  }, [canUndo, canRedo, onHistoryChange])
 
   const applyInteractionState = (canvasInstance: fabric.Canvas) => {
     const isDrawing = activeTool === 'pen'
@@ -397,6 +490,11 @@ export const WhiteboardCanvas = ({
 
     const broadcast = () => {
       if (isApplyingRemoteRef.current) return
+      
+      // Save to history
+      saveToHistory()
+      
+      // Broadcast to other users
       emitSnapshot()
       
       // Auto-save to database if sessionId exists
@@ -419,7 +517,7 @@ export const WhiteboardCanvas = ({
       canvas.off('object:modified', broadcast)
       canvas.off('object:removed', broadcast)
     }
-  }, [canvas, emitSnapshot, sessionId])
+  }, [canvas, emitSnapshot, sessionId, saveToHistory])
 
   useEffect(() => {
     if (!canvas || !subscribeWhiteboardOperation) return
@@ -552,12 +650,28 @@ export const WhiteboardCanvas = ({
     if (!canvas) return
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Undo: Ctrl+Z or Cmd+Z
+      if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+        event.preventDefault()
+        handleUndo()
+        return
+      }
+      
+      // Redo: Ctrl+Y or Cmd+Shift+Z
+      if ((event.ctrlKey || event.metaKey) && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
+        event.preventDefault()
+        handleRedo()
+        return
+      }
+      
+      // Delete selected objects
       if (event.key === 'Delete' || event.key === 'Backspace') {
         const activeObjects = canvas.getActiveObjects()
         if (activeObjects.length) {
           activeObjects.forEach((object: fabric.Object) => canvas.remove(object))
           canvas.discardActiveObject()
           canvas.requestRenderAll()
+          saveToHistory()
           emitSnapshot()
         }
       }
@@ -565,7 +679,7 @@ export const WhiteboardCanvas = ({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [canvas, emitSnapshot])
+  }, [canvas, emitSnapshot, handleUndo, handleRedo, saveToHistory])
 
   const spectrumOverlayClass =
     theme === 'dark'

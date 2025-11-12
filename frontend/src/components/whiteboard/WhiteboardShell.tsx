@@ -1,7 +1,9 @@
 import { Moon, Sun } from 'lucide-react'
+import { useState } from 'react'
 import type { AppTheme } from '../../App'
 import logoImage from '../../assets/logo.png'
 import type { PresenceEntry } from '../../hooks/useSessionPresence'
+import { CanvasActions } from './controls/CanvasActions'
 import { PaletteFlyout } from './controls/PaletteFlyout'
 import { ToolRail } from './controls/ToolRail'
 import { WhiteboardCanvas } from './core/WhiteboardCanvas'
@@ -39,6 +41,11 @@ export const WhiteboardShell = ({
   emitWhiteboardOperation,
   subscribeWhiteboardOperation,
 }: WhiteboardShellProps) => {
+  const [undoHandler, setUndoHandler] = useState<(() => void) | null>(null)
+  const [redoHandler, setRedoHandler] = useState<(() => void) | null>(null)
+  const [clearHandler, setClearHandler] = useState<(() => void) | null>(null)
+  const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false })
+
   const gradientClass =
     theme === 'dark'
       ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950'
@@ -75,6 +82,17 @@ export const WhiteboardShell = ({
             <Moon className="h-5 w-5" />
           )}
         </button>
+        
+        <div className="mt-4">
+          <CanvasActions
+            theme={theme}
+            onUndo={() => undoHandler?.()}
+            onRedo={() => redoHandler?.()}
+            onClear={() => clearHandler?.()}
+            canUndo={historyState.canUndo}
+            canRedo={historyState.canRedo}
+          />
+        </div>
       </div>
       {participants && participants.length > 0 && (
         <div className="absolute left-6 top-6 z-20 flex gap-3">
@@ -125,6 +143,10 @@ export const WhiteboardShell = ({
           subscribeCursorMove={subscribeCursorMove}
           emitWhiteboardOperation={emitWhiteboardOperation}
           subscribeWhiteboardOperation={subscribeWhiteboardOperation}
+          onUndo={(handler) => setUndoHandler(() => handler)}
+          onRedo={(handler) => setRedoHandler(() => handler)}
+          onClear={(handler) => setClearHandler(() => handler)}
+          onHistoryChange={setHistoryState}
         />
       </div>
     </div>
