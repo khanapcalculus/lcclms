@@ -14,6 +14,7 @@ export const createApp = () => {
     'http://localhost:5173',
     'http://192.168.31.169:5173',
     env.clientOrigin,
+    env.clientOrigin?.replace(/\/$/, ''), // Remove trailing slash if present
   ].filter(Boolean)
 
   app.use(
@@ -24,6 +25,11 @@ export const createApp = () => {
         
         // Check if origin is in allowed list or if clientOrigin is wildcard
         if (env.clientOrigin === '*' || allowedOrigins.includes(origin)) {
+          return callback(null, true)
+        }
+        
+        // Also check if origin + '/' matches
+        if (allowedOrigins.includes(origin + '/')) {
           return callback(null, true)
         }
         

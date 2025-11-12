@@ -15,6 +15,7 @@ const start = async () => {
     'http://localhost:5173',
     'http://192.168.31.169:5173',
     env.clientOrigin,
+    env.clientOrigin?.replace(/\/$/, ''), // Remove trailing slash if present
   ].filter(Boolean)
 
   const io = new Server(httpServer, {
@@ -22,6 +23,10 @@ const start = async () => {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true)
         if (env.clientOrigin === '*' || allowedOrigins.includes(origin)) {
+          return callback(null, true)
+        }
+        // Also check if origin + '/' matches
+        if (allowedOrigins.includes(origin + '/')) {
           return callback(null, true)
         }
         callback(new Error('Not allowed by CORS'))
