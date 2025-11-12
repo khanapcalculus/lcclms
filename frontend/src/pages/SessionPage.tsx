@@ -81,7 +81,6 @@ export const SessionPage = ({ theme, onToggleTheme }: SessionPageProps) => {
     <WhiteboardShell
       theme={theme}
       onToggleTheme={onToggleTheme}
-      sessionTitle={session.title}
       participants={presence}
       currentUserId={user?.id}
       emitCursorMove={emitCursorMove}

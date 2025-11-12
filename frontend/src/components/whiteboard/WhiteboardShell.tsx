@@ -1,4 +1,4 @@
-import { Moon, Sun, Users } from 'lucide-react'
+import { Moon, Sun } from 'lucide-react'
 import type { AppTheme } from '../../App'
 import logoImage from '../../assets/logo.png'
 import type { PresenceEntry } from '../../hooks/useSessionPresence'
@@ -9,7 +9,6 @@ import { WhiteboardCanvas } from './core/WhiteboardCanvas'
 type WhiteboardShellProps = {
   theme: AppTheme
   onToggleTheme: () => void
-  sessionTitle?: string
   participants?: PresenceEntry[]
   currentUserId?: string
   emitCursorMove?: (payload: { x: number; y: number }) => void
@@ -28,16 +27,9 @@ type WhiteboardShellProps = {
   ) => () => void
 }
 
-const roleColorMap: Record<PresenceEntry['role'], string> = {
-  admin: 'bg-purple-500/80',
-  tutor: 'bg-sky-500/80',
-  student: 'bg-emerald-500/80',
-}
-
 export const WhiteboardShell = ({
   theme,
   onToggleTheme,
-  sessionTitle,
   participants,
   currentUserId,
   emitCursorMove,
