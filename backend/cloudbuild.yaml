@@ -26,10 +26,8 @@ steps:
       - '4000'
       - '--memory'
       - '512Mi'
-      - '--set-secrets'
-      - 'MONGODB_URI=mongodb-uri:latest,JWT_SECRET=jwt-secret:latest'
       - '--set-env-vars'
-      - 'NODE_ENV=production,PORT=4000'
+      - 'NODE_ENV=production,PORT=4000,MONGODB_URI=mongodb+srv://khanapcalculus:Thazhath12@cluster0.ipy6r.mongodb.net/lcclms?retryWrites=true&w=majority,JWT_SECRET=abcdefghijklmnopqrstuvwxyz1234567890ABCDEF,CLIENT_ORIGIN=*'
 
 images:
   - 'gcr.io/$PROJECT_ID/lcclms-backend'
