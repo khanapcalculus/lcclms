@@ -14,7 +14,7 @@ const envSchema = z.object({
     .default('3000' as unknown as number),
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
-  CLIENT_ORIGIN: z.string().url().optional(),
+  CLIENT_ORIGIN: z.string().optional(),
 })
 
 const parsed = envSchema.safeParse({
