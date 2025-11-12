@@ -64,12 +64,12 @@ export const WhiteboardShell = ({
           <PaletteFlyout theme={theme} />
         </div>
       </div>
-      <div className="absolute right-2 top-2 z-20 flex flex-col items-center gap-2 sm:right-4 sm:top-4 sm:gap-3 md:right-6 md:top-6">
-        <img src={logoImage} alt="Studio logo" className="max-h-10 max-w-[80px] sm:max-h-12 sm:max-w-[100px] md:max-h-16 md:max-w-[120px]" />
+      <div className="absolute right-1 top-1 z-20 flex flex-col items-center gap-1.5 sm:right-4 sm:top-4 sm:gap-3 md:right-6 md:top-6">
+        <img src={logoImage} alt="Studio logo" className="max-h-8 max-w-[60px] sm:max-h-12 sm:max-w-[100px] md:max-h-16 md:max-w-[120px]" />
         <button
           type="button"
           onClick={onToggleTheme}
-          className={`flex h-10 w-10 items-center justify-center rounded-2xl border sm:h-12 sm:w-12 ${
+          className={`flex h-8 w-8 items-center justify-center rounded-xl border sm:h-10 sm:w-10 sm:rounded-2xl md:h-12 md:w-12 ${
             theme === 'dark'
               ? 'border-white/20 bg-white/10 text-slate-100 shadow-[0_12px_28px_rgba(15,23,42,0.45)] hover:bg-white/16'
               : 'border-slate-200/80 bg-white/90 text-slate-700 shadow-[0_12px_28px_rgba(148,163,184,0.35)] hover:bg-white'
@@ -77,13 +77,13 @@ export const WhiteboardShell = ({
           aria-label="Toggle theme"
         >
           {theme === 'dark' ? (
-            <Sun className="h-4 w-4 sm:h-5 sm:w-5" />
+            <Sun className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
           ) : (
-            <Moon className="h-4 w-4 sm:h-5 sm:w-5" />
+            <Moon className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
           )}
         </button>
         
-        <div className="mt-2 sm:mt-4">
+        <div className="mt-1 sm:mt-2 md:mt-4">
           <CanvasActions
             theme={theme}
             onUndo={() => undoHandler?.()}

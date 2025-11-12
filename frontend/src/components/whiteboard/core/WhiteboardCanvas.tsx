@@ -206,10 +206,10 @@ export const WhiteboardCanvas = ({
     if (canvasInstance.freeDrawingBrush && isDrawing) {
       canvasInstance.freeDrawingBrush.color = strokeColor
       canvasInstance.freeDrawingBrush.width = strokeWidth
-      // Optimize brush settings for tablet
-      ;(canvasInstance.freeDrawingBrush as any).minWidth = strokeWidth * 0.5
-      ;(canvasInstance.freeDrawingBrush as any).maxWidth = strokeWidth * 1.5
-      ;(canvasInstance.freeDrawingBrush as any).smoothFactor = 0.5
+      // Optimize brush settings for tablet - immediate response
+      ;(canvasInstance.freeDrawingBrush as any).decimate = 0
+      ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
+      ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
     }
 
     canvasInstance.forEachObject((object) => {
@@ -256,11 +256,10 @@ export const WhiteboardCanvas = ({
     if (fabricCanvas.freeDrawingBrush) {
       fabricCanvas.freeDrawingBrush.color = strokeColor
       fabricCanvas.freeDrawingBrush.width = strokeWidth
-      // Optimize for smooth tablet drawing
-      ;(fabricCanvas.freeDrawingBrush as any).minWidth = strokeWidth * 0.5
-      ;(fabricCanvas.freeDrawingBrush as any).maxWidth = strokeWidth * 1.5
-      // Reduce smoothing for more responsive input
-      ;(fabricCanvas.freeDrawingBrush as any).smoothFactor = 0.5
+      // Optimize for smooth tablet drawing - reduced smoothing for immediate response
+      ;(fabricCanvas.freeDrawingBrush as any).decimate = 0 // No decimation for smoother lines
+      ;(fabricCanvas.freeDrawingBrush as any).strokeLineCap = 'round'
+      ;(fabricCanvas.freeDrawingBrush as any).strokeLineJoin = 'round'
     }
 
     fabricCanvas.setDimensions({
@@ -512,7 +511,7 @@ export const WhiteboardCanvas = ({
         clearTimeout(broadcastTimeout)
       }
       
-      // Throttle broadcasts to every 200ms during active drawing
+      // Throttle broadcasts to every 500ms during active drawing for better tablet performance
       broadcastTimeout = setTimeout(() => {
         // Save to history
         saveToHistory()
@@ -527,7 +526,7 @@ export const WhiteboardCanvas = ({
             console.warn('Could not save canvas:', err)
           })
         }
-      }, 200)
+      }, 500)
     }
 
     // Optimize path creation for tablet - render immediately but throttle broadcasts
