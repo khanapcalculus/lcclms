@@ -20,8 +20,9 @@ const start = async () => {
 
   registerRtcGateway(io)
 
-  httpServer.listen(env.port, () => {
-    console.info(`🚀 Server listening on port ${env.port}`)
+  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost'
+  httpServer.listen(env.port, host, () => {
+    console.info(`🚀 Server listening on ${host}:${env.port}`)
   })
 
   const shutdown = (signal: string) => {
