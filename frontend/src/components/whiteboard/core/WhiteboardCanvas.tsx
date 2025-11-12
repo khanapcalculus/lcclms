@@ -206,6 +206,10 @@ export const WhiteboardCanvas = ({
     if (canvasInstance.freeDrawingBrush && isDrawing) {
       canvasInstance.freeDrawingBrush.color = strokeColor
       canvasInstance.freeDrawingBrush.width = strokeWidth
+      // Optimize brush settings for tablet
+      ;(canvasInstance.freeDrawingBrush as any).minWidth = strokeWidth * 0.5
+      ;(canvasInstance.freeDrawingBrush as any).maxWidth = strokeWidth * 1.5
+      ;(canvasInstance.freeDrawingBrush as any).smoothFactor = 0.5
     }
 
     canvasInstance.forEachObject((object) => {
@@ -241,12 +245,22 @@ export const WhiteboardCanvas = ({
       preserveObjectStacking: true,
       enableRetinaScaling: true,
       renderOnAddRemove: false,
+      // Tablet/stylus optimizations
+      enablePointerEvents: true,
+      allowTouchScrolling: false,
+      skipTargetFind: false,
     })
 
+    // Optimize brush for tablet/stylus input
     fabricCanvas.freeDrawingBrush = new fabric.PencilBrush(fabricCanvas)
     if (fabricCanvas.freeDrawingBrush) {
       fabricCanvas.freeDrawingBrush.color = strokeColor
       fabricCanvas.freeDrawingBrush.width = strokeWidth
+      // Optimize for smooth tablet drawing
+      ;(fabricCanvas.freeDrawingBrush as any).minWidth = strokeWidth * 0.5
+      ;(fabricCanvas.freeDrawingBrush as any).maxWidth = strokeWidth * 1.5
+      // Reduce smoothing for more responsive input
+      ;(fabricCanvas.freeDrawingBrush as any).smoothFactor = 0.5
     }
 
     fabricCanvas.setDimensions({
@@ -488,31 +502,52 @@ export const WhiteboardCanvas = ({
   useEffect(() => {
     if (!canvas) return
 
+    // Throttle broadcasts to improve performance during drawing
+    let broadcastTimeout: NodeJS.Timeout | null = null
     const broadcast = () => {
       if (isApplyingRemoteRef.current) return
       
-      // Save to history
-      saveToHistory()
-      
-      // Broadcast to other users
-      emitSnapshot()
-      
-      // Auto-save to database if sessionId exists
-      if (sessionId) {
-        const canvasData = canvas.toJSON()
-        canvasService.saveCanvasState(sessionId, canvasData).catch((err) => {
-          console.warn('Could not save canvas:', err)
-        })
+      // Clear existing timeout
+      if (broadcastTimeout) {
+        clearTimeout(broadcastTimeout)
       }
+      
+      // Throttle broadcasts to every 200ms during active drawing
+      broadcastTimeout = setTimeout(() => {
+        // Save to history
+        saveToHistory()
+        
+        // Broadcast to other users
+        emitSnapshot()
+        
+        // Auto-save to database if sessionId exists (debounced)
+        if (sessionId) {
+          const canvasData = canvas.toJSON()
+          canvasService.saveCanvasState(sessionId, canvasData).catch((err) => {
+            console.warn('Could not save canvas:', err)
+          })
+        }
+      }, 200)
     }
 
-    canvas.on('path:created', broadcast)
+    // Optimize path creation for tablet - render immediately but throttle broadcasts
+    const handlePathCreated = () => {
+      // Render immediately for smooth drawing
+      canvas.requestRenderAll()
+      // Broadcast after a delay
+      broadcast()
+    }
+    
+    canvas.on('path:created', handlePathCreated)
     canvas.on('object:added', broadcast)
     canvas.on('object:modified', broadcast)
     canvas.on('object:removed', broadcast)
 
     return () => {
-      canvas.off('path:created', broadcast)
+      if (broadcastTimeout) {
+        clearTimeout(broadcastTimeout)
+      }
+      canvas.off('path:created', handlePathCreated)
       canvas.off('object:added', broadcast)
       canvas.off('object:modified', broadcast)
       canvas.off('object:removed', broadcast)
@@ -713,7 +748,12 @@ export const WhiteboardCanvas = ({
       <canvas 
         ref={canvasElementRef} 
         className="relative z-10 h-full w-full touch-none" 
-        style={{ touchAction: 'none' }}
+        style={{ 
+          touchAction: 'none',
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none',
+        }}
       />
 
       <div className="pointer-events-none absolute inset-0 opacity-50 mix-blend-soft-light">
