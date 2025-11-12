@@ -1,0 +1,2 @@
+export { registerRtcGateway } from './rtcGateway'
+

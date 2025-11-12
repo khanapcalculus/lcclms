@@ -1,9 +1,44 @@
 import { fabric } from 'fabric'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AppTheme } from '../../../App'
+import type { PresenceEntry } from '../../../hooks/useSessionPresence'
 import { useWhiteboardStore } from '../../../store/whiteboardStore'
 
 type FabricObject = fabric.Object | fabric.Line | fabric.Ellipse | fabric.Rect
+type CanvasSnapshot = ReturnType<fabric.Canvas['toJSON']>
+
+type RemoteCursor = {
+  x: number
+  y: number
+  displayName: string
+  role: PresenceEntry['role']
+}
+
+type WhiteboardCanvasProps = {
+  theme: AppTheme
+  participants?: PresenceEntry[]
+  currentUserId?: string
+  emitCursorMove?: (payload: { x: number; y: number }) => void
+  subscribeCursorMove?: (
+    handler: (payload: {
+      userId: string
+      displayName: string
+      role: PresenceEntry['role']
+      x: number
+      y: number
+    }) => void
+  ) => () => void
+  emitWhiteboardOperation?: (payload: { state: unknown }) => void
+  subscribeWhiteboardOperation?: (
+    handler: (payload: { userId: string; state: unknown }) => void
+  ) => () => void
+}
+
+const roleColorMap: Record<PresenceEntry['role'], string> = {
+  admin: 'bg-purple-500/80',
+  tutor: 'bg-sky-500/80',
+  student: 'bg-emerald-500/80',
+}
 
 const configureFabricDefaults = () => {
   fabric.Object.prototype.transparentCorners = false
@@ -16,11 +51,15 @@ const configureFabricDefaults = () => {
 
 configureFabricDefaults()
 
-type WhiteboardCanvasProps = {
-  theme: AppTheme
-}
-
-export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
+export const WhiteboardCanvas = ({
+  theme,
+  participants,
+  currentUserId,
+  emitCursorMove,
+  subscribeCursorMove,
+  emitWhiteboardOperation,
+  subscribeWhiteboardOperation,
+}: WhiteboardCanvasProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasElementRef = useRef<HTMLCanvasElement>(null)
   const [canvas, setCanvas] = useState<fabric.Canvas | null>(null)
@@ -38,11 +77,67 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
   } | null>(null)
   const isPanningRef = useRef(false)
   const lastPanPointRef = useRef<{ x: number; y: number } | null>(null)
+  const isApplyingRemoteRef = useRef(false)
+  const lastCursorEmitRef = useRef(0)
+  const [remoteCursors, setRemoteCursors] = useState<Record<string, RemoteCursor>>({})
+
+  const broadcastSnapshot = useMemo(() => {
+    if (!emitWhiteboardOperation) return undefined
+    return (snapshot: CanvasSnapshot) => emitWhiteboardOperation({ state: snapshot })
+  }, [emitWhiteboardOperation])
+
+  const emitSnapshot = useCallback(() => {
+    if (!canvas || !broadcastSnapshot) return
+    const snapshot = canvas.toJSON()
+    broadcastSnapshot(snapshot)
+  }, [canvas, broadcastSnapshot])
+
+  const applyInteractionState = (canvasInstance: fabric.Canvas) => {
+    const isDrawing = activeTool === 'pen'
+    const isPan = activeTool === 'pan'
+    canvasInstance.isDrawingMode = isDrawing
+    canvasInstance.selection = activeTool === 'select'
+    canvasInstance.skipTargetFind = isPan
+    canvasInstance.defaultCursor =
+      activeTool === 'pen'
+        ? 'crosshair'
+        : isPan
+          ? 'grab'
+          : activeTool === 'eraser'
+            ? 'cell'
+            : 'default'
+
+    if (canvasInstance.freeDrawingBrush && isDrawing) {
+      canvasInstance.freeDrawingBrush.color = strokeColor
+      canvasInstance.freeDrawingBrush.width = strokeWidth
+    }
+
+    canvasInstance.forEachObject((object) => {
+      const isSelectable = activeTool === 'select'
+      object.selectable = isSelectable
+      object.evented = !isPan
+      object.hoverCursor = isSelectable ? 'move' : canvasInstance.defaultCursor
+      object.hasControls = isSelectable
+      object.lockMovementX = !isSelectable
+      object.lockMovementY = !isSelectable
+      object.lockRotation = !isSelectable
+      object.lockScalingFlip = !isSelectable
+      object.lockScalingX = !isSelectable
+      object.lockScalingY = !isSelectable
+    })
+
+    if (isPan) {
+      canvasInstance.discardActiveObject()
+      canvasInstance.requestRenderAll()
+    } else {
+      isPanningRef.current = false
+      lastPanPointRef.current = null
+      canvasInstance.setCursor(canvasInstance.defaultCursor)
+    }
+  }
 
   useEffect(() => {
-    if (!canvasElementRef.current || !containerRef.current) {
-      return
-    }
+    if (!canvasElementRef.current || !containerRef.current) return
 
     const fabricCanvas = new fabric.Canvas(canvasElementRef.current, {
       backgroundColor: 'rgba(248, 250, 252, 0.28)',
@@ -84,56 +179,8 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
 
   useEffect(() => {
     if (!canvas) return
-
-    const isDrawing = activeTool === 'pen'
-    const isPan = activeTool === 'pan'
-    canvas.isDrawingMode = isDrawing
-    canvas.selection = activeTool === 'select'
-    canvas.skipTargetFind = isPan
-    canvas.defaultCursor =
-      activeTool === 'pen'
-        ? 'crosshair'
-        : isPan
-          ? 'grab'
-          : activeTool === 'eraser'
-            ? 'cell'
-            : 'default'
-
-    if (canvas.freeDrawingBrush && isDrawing) {
-      canvas.freeDrawingBrush.color = strokeColor
-      canvas.freeDrawingBrush.width = strokeWidth
-    }
-
-    canvas.forEachObject((object) => {
-      const isSelectable = activeTool === 'select'
-      object.selectable = isSelectable
-      object.evented = !isPan
-      object.hoverCursor = isSelectable ? 'move' : canvas.defaultCursor
-      object.hasControls = isSelectable
-      object.lockMovementX = !isSelectable
-      object.lockMovementY = !isSelectable
-      object.lockRotation = !isSelectable
-      object.lockScalingFlip = !isSelectable
-      object.lockScalingX = !isSelectable
-      object.lockScalingY = !isSelectable
-    })
-
-    if (isPan) {
-      canvas.discardActiveObject()
-      canvas.requestRenderAll()
-    }
-
-    if (!isPan) {
-      isPanningRef.current = false
-      lastPanPointRef.current = null
-      canvas.setCursor(canvas.defaultCursor)
-    }
-
-    if (activeTool !== 'select') {
-      canvas.discardActiveObject()
-      canvas.requestRenderAll()
-    }
-  }, [canvas, activeTool, strokeColor, strokeWidth])
+    applyInteractionState(canvas)
+  }, [canvas, activeTool, strokeColor, strokeWidth, fillColor])
 
   useEffect(() => {
     if (!canvas) return
@@ -164,6 +211,7 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
         if (target) {
           canvas.remove(target)
           canvas.requestRenderAll()
+          emitSnapshot()
         }
         return
       }
@@ -172,7 +220,7 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
         return
       }
 
-      const commonOptions = {
+      const baseOptions = {
         left: pointer.x,
         top: pointer.y,
         stroke: strokeColor,
@@ -181,11 +229,11 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
         objectCaching: false,
       }
 
-      let newObject: FabricObject | null = null
+      let object: FabricObject | null = null
 
       if (activeTool === 'rectangle') {
-        newObject = new fabric.Rect({
-          ...commonOptions,
+        object = new fabric.Rect({
+          ...baseOptions,
           width: 0,
           height: 0,
           rx: 16,
@@ -193,8 +241,8 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
           fill: fillColor === 'transparent' ? 'transparent' : fillColor,
         })
       } else if (activeTool === 'ellipse') {
-        newObject = new fabric.Ellipse({
-          ...commonOptions,
+        object = new fabric.Ellipse({
+          ...baseOptions,
           rx: 0,
           ry: 0,
           originX: 'center',
@@ -202,7 +250,7 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
           fill: fillColor === 'transparent' ? 'transparent' : fillColor,
         })
       } else if (activeTool === 'line') {
-        newObject = new fabric.Line([pointer.x, pointer.y, pointer.x, pointer.y], {
+        object = new fabric.Line([pointer.x, pointer.y, pointer.x, pointer.y], {
           stroke: strokeColor,
           strokeWidth,
           originX: 'center',
@@ -211,13 +259,13 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
         })
       }
 
-      if (newObject) {
+      if (object) {
         drawingRef.current = {
-          object: newObject,
+          object,
           originX: pointer.x,
           originY: pointer.y,
         }
-        canvas.add(newObject)
+        canvas.add(object)
         canvas.requestRenderAll()
       }
     }
@@ -306,28 +354,10 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
         return
       }
 
-      const state = drawingRef.current
-      if (!state || !state.object) {
+      if (drawingRef.current?.object) {
         drawingRef.current = null
-        return
+        emitSnapshot()
       }
-      const { object } = state
-
-      const isDegenerate =
-        (object instanceof fabric.Rect && (!object.width || !object.height)) ||
-        (object instanceof fabric.Ellipse && (!object.rx || !object.ry)) ||
-        (object instanceof fabric.Line &&
-          object.x1 === object.x2 &&
-          object.y1 === object.y2)
-
-      if (isDegenerate && object) {
-        canvas.remove(object)
-      } else if (object) {
-        object.objectCaching = true
-      }
-
-      drawingRef.current = null
-      canvas.requestRenderAll()
     }
 
     canvas.on('mouse:down', handleMouseDown)
@@ -339,7 +369,106 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
       canvas.off('mouse:move', handleMouseMove)
       canvas.off('mouse:up', handleMouseUp)
     }
-  }, [canvas, activeTool, strokeColor, strokeWidth, fillColor])
+  }, [canvas, activeTool, strokeColor, strokeWidth, fillColor, emitSnapshot])
+
+  useEffect(() => {
+    if (!canvas) return
+
+    const broadcast = () => {
+      if (isApplyingRemoteRef.current) return
+      emitSnapshot()
+    }
+
+    canvas.on('path:created', broadcast)
+    canvas.on('object:added', broadcast)
+    canvas.on('object:modified', broadcast)
+    canvas.on('object:removed', broadcast)
+
+    return () => {
+      canvas.off('path:created', broadcast)
+      canvas.off('object:added', broadcast)
+      canvas.off('object:modified', broadcast)
+      canvas.off('object:removed', broadcast)
+    }
+  }, [canvas, emitSnapshot])
+
+  useEffect(() => {
+    if (!canvas || !subscribeWhiteboardOperation) return
+
+    const unsubscribe = subscribeWhiteboardOperation(({ userId, state }) => {
+      if (userId === currentUserId) return
+      isApplyingRemoteRef.current = true
+      canvas.loadFromJSON(state as CanvasSnapshot, () => {
+        isApplyingRemoteRef.current = false
+        canvas.requestRenderAll()
+      })
+    })
+
+    return unsubscribe
+  }, [canvas, subscribeWhiteboardOperation, currentUserId])
+
+  useEffect(() => {
+    if (!canvas || !emitCursorMove) return
+
+    const handleMouseMove = (event: fabric.IEvent<Event>) => {
+      const now = performance.now()
+      if (now - lastCursorEmitRef.current < 50) return
+      lastCursorEmitRef.current = now
+
+      const pointer = canvas.getPointer(event.e as any)
+      if (!pointer) return
+
+      const width = canvas.getWidth() || containerRef.current?.clientWidth
+      const height = canvas.getHeight() || containerRef.current?.clientHeight
+      if (!width || !height) return
+
+      emitCursorMove({
+        x: pointer.x / width,
+        y: pointer.y / height,
+      })
+    }
+
+    canvas.on('mouse:move', handleMouseMove)
+    return () => {
+      canvas.off('mouse:move', handleMouseMove)
+    }
+  }, [canvas, emitCursorMove])
+
+  useEffect(() => {
+    if (!canvas || !subscribeCursorMove) return
+
+    const unsubscribe = subscribeCursorMove(({ userId, x, y, displayName, role }) => {
+      if (userId === currentUserId) return
+      const width = canvas.getWidth() || containerRef.current?.clientWidth || 1
+      const height = canvas.getHeight() || containerRef.current?.clientHeight || 1
+
+      setRemoteCursors((prev) => ({
+        ...prev,
+        [userId]: {
+          x: x * width,
+          y: y * height,
+          displayName,
+          role,
+        },
+      }))
+    })
+
+    return unsubscribe
+  }, [canvas, subscribeCursorMove, currentUserId])
+
+  useEffect(() => {
+    if (!participants) return
+    setRemoteCursors((prev) => {
+      const allowed = new Set(participants.map((entry) => entry.userId))
+      const next: typeof prev = {}
+      for (const [id, cursor] of Object.entries(prev)) {
+        if (allowed.has(id)) {
+          next[id] = cursor
+        }
+      }
+      return next
+    })
+  }, [participants])
 
   useEffect(() => {
     if (!canvas || !pendingImage) return
@@ -378,6 +507,7 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
           canvas.add(image)
           canvas.setActiveObject(image)
           canvas.requestRenderAll()
+          emitSnapshot()
         },
         {
           crossOrigin: 'anonymous',
@@ -387,7 +517,7 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
     reader.readAsDataURL(pendingImage)
 
     setPendingImage(null)
-  }, [canvas, pendingImage, setPendingImage])
+  }, [canvas, pendingImage, setPendingImage, emitSnapshot])
 
   useEffect(() => {
     if (!canvas) return
@@ -399,13 +529,14 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
           activeObjects.forEach((object: fabric.Object) => canvas.remove(object))
           canvas.discardActiveObject()
           canvas.requestRenderAll()
+          emitSnapshot()
         }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [canvas])
+  }, [canvas, emitSnapshot])
 
   const spectrumOverlayClass =
     theme === 'dark'
@@ -446,6 +577,26 @@ export const WhiteboardCanvas = ({ theme }: WhiteboardCanvasProps) => {
             backgroundSize: '48px 48px',
           }}
         ></div>
+      </div>
+
+      <div className="pointer-events-none absolute inset-0 z-20">
+        {Object.entries(remoteCursors).map(([userId, cursor]) => (
+          <div
+            key={userId}
+            className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 text-xs"
+            style={{
+              left: `${cursor.x}px`,
+              top: `${cursor.y}px`,
+            }}
+          >
+            <div
+              className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white ${roleColorMap[cursor.role]}`}
+            >
+              {cursor.displayName}
+            </div>
+            <div className="h-3 w-3 rotate-45 rounded-sm bg-white/80 shadow-[0_4px_10px_rgba(0,0,0,0.3)]"></div>
+          </div>
+        ))}
       </div>
     </div>
   )

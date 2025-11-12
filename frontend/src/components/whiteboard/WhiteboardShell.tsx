@@ -1,6 +1,7 @@
-import { Moon, Sun } from 'lucide-react'
+import { Moon, Sun, Users } from 'lucide-react'
 import type { AppTheme } from '../../App'
 import logoImage from '../../assets/logo.png'
+import type { PresenceEntry } from '../../hooks/useSessionPresence'
 import { PaletteFlyout } from './controls/PaletteFlyout'
 import { ToolRail } from './controls/ToolRail'
 import { WhiteboardCanvas } from './core/WhiteboardCanvas'
@@ -8,9 +9,44 @@ import { WhiteboardCanvas } from './core/WhiteboardCanvas'
 type WhiteboardShellProps = {
   theme: AppTheme
   onToggleTheme: () => void
+  sessionTitle?: string
+  sessionTime?: string
+  participants?: PresenceEntry[]
+  currentUserId?: string
+  emitCursorMove?: (payload: { x: number; y: number }) => void
+  subscribeCursorMove?: (
+    handler: (payload: {
+      userId: string
+      displayName: string
+      role: PresenceEntry['role']
+      x: number
+      y: number
+    }) => void
+  ) => () => void
+  emitWhiteboardOperation?: (payload: unknown) => void
+  subscribeWhiteboardOperation?: (
+    handler: (payload: { userId: string; state: unknown }) => void
+  ) => () => void
 }
 
-export const WhiteboardShell = ({ theme, onToggleTheme }: WhiteboardShellProps) => {
+const roleColorMap: Record<PresenceEntry['role'], string> = {
+  admin: 'bg-purple-500/80',
+  tutor: 'bg-sky-500/80',
+  student: 'bg-emerald-500/80',
+}
+
+export const WhiteboardShell = ({
+  theme,
+  onToggleTheme,
+  sessionTitle,
+  sessionTime,
+  participants,
+  currentUserId,
+  emitCursorMove,
+  subscribeCursorMove,
+  emitWhiteboardOperation,
+  subscribeWhiteboardOperation,
+}: WhiteboardShellProps) => {
   const gradientClass =
     theme === 'dark'
       ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950'
@@ -48,9 +84,55 @@ export const WhiteboardShell = ({ theme, onToggleTheme }: WhiteboardShellProps) 
           )}
         </button>
       </div>
+      {participants && participants.length > 0 && (
+        <div className="absolute left-6 top-6 z-20 flex gap-3">
+          {participants.map((participant) => {
+            const initials = participant.displayName
+              .split(' ')
+              .map((n) => n[0])
+              .join('')
+              .toUpperCase()
+              .slice(0, 2)
+            
+            return (
+              <div
+                key={participant.userId}
+                className="group relative"
+                title={`${participant.displayName} (${participant.role})`}
+              >
+                <div
+                  className={`flex h-12 w-12 items-center justify-center rounded-full border-2 font-semibold text-white shadow-[0_12px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-transform hover:scale-110 ${
+                    participant.role === 'admin'
+                      ? 'border-purple-400/70 bg-purple-500/80'
+                      : participant.role === 'tutor'
+                        ? 'border-sky-400/70 bg-sky-500/80'
+                        : 'border-emerald-400/70 bg-emerald-500/80'
+                  }`}
+                >
+                  {initials}
+                </div>
+                <div className="absolute left-0 top-full mt-3 hidden whitespace-nowrap rounded-xl border border-white/15 bg-slate-900/95 px-3 py-2 text-xs font-medium text-white shadow-xl backdrop-blur-xl group-hover:block">
+                  <p className="font-semibold">{participant.displayName}</p>
+                  <p className="mt-0.5 text-[10px] uppercase tracking-wider text-white/60">
+                    {participant.role}
+                  </p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
       <div className="relative flex h-full w-full items-center justify-center px-0 py-0">
         <div className={`absolute inset-0 -z-10 ${auraClass} blur-3xl`}></div>
-        <WhiteboardCanvas theme={theme} />
+        <WhiteboardCanvas
+          theme={theme}
+          participants={participants}
+          currentUserId={currentUserId}
+          emitCursorMove={emitCursorMove}
+          subscribeCursorMove={subscribeCursorMove}
+          emitWhiteboardOperation={emitWhiteboardOperation}
+          subscribeWhiteboardOperation={subscribeWhiteboardOperation}
+        />
       </div>
     </div>
   )
