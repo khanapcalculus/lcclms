@@ -503,7 +503,7 @@ export const WhiteboardCanvas = ({
     if (!canvas) return
 
     // Throttle broadcasts to improve performance during drawing
-    let broadcastTimeout: NodeJS.Timeout | null = null
+    let broadcastTimeout: ReturnType<typeof setTimeout> | null = null
     const broadcast = () => {
       if (isApplyingRemoteRef.current) return
       
