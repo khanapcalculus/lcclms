@@ -10,7 +10,6 @@ type WhiteboardShellProps = {
   theme: AppTheme
   onToggleTheme: () => void
   sessionTitle?: string
-  sessionTime?: string
   participants?: PresenceEntry[]
   currentUserId?: string
   emitCursorMove?: (payload: { x: number; y: number }) => void
@@ -39,7 +38,6 @@ export const WhiteboardShell = ({
   theme,
   onToggleTheme,
   sessionTitle,
-  sessionTime,
   participants,
   currentUserId,
   emitCursorMove,

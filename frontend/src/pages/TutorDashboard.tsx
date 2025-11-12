@@ -38,8 +38,6 @@ const INTERNATIONAL_TIMEZONES = [
   { value: 'Pacific/Auckland', label: 'Auckland (NZDT/NZST)' },
 ]
 
-const ALL_TIMEZONES = [...US_TIMEZONES, ...INTERNATIONAL_TIMEZONES]
-
 export const TutorDashboard = () => {
   const { user } = useAuthStore()
   const [sessions, setSessions] = useState<Session[]>([])

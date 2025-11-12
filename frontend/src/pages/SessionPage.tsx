@@ -82,18 +82,6 @@ export const SessionPage = ({ theme, onToggleTheme }: SessionPageProps) => {
       theme={theme}
       onToggleTheme={onToggleTheme}
       sessionTitle={session.title}
-      sessionTime={`${new Date(session.scheduledStart).toLocaleString(undefined, {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZoneName: 'short',
-      })} - ${new Date(session.scheduledEnd).toLocaleTimeString(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZoneName: 'short',
-      })}`}
       participants={presence}
       currentUserId={user?.id}
       emitCursorMove={emitCursorMove}
