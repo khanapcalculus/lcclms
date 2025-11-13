@@ -229,6 +229,29 @@ export const WhiteboardCanvas = ({
         ;(canvasInstance.freeDrawingBrush as any).limitedToCanvasSize = true
         ;(canvasInstance.freeDrawingBrush as any).strokeMiterLimit = 10
       }
+      
+      // CRITICAL FIX: Patch brush to work with viewport transform (pan)
+      const originalOnMouseDown = (canvasInstance.freeDrawingBrush as any).onMouseDown.bind(canvasInstance.freeDrawingBrush)
+      ;(canvasInstance.freeDrawingBrush as any).onMouseDown = function(pointer: any, options: any) {
+        const vpt = canvasInstance.viewportTransform
+        if (vpt) {
+          const invertedVPT = fabric.util.invertTransform(vpt)
+          const transformedPoint = fabric.util.transformPoint(pointer, invertedVPT)
+          return originalOnMouseDown(transformedPoint, options)
+        }
+        return originalOnMouseDown(pointer, options)
+      }
+      
+      const originalOnMouseMove = (canvasInstance.freeDrawingBrush as any).onMouseMove.bind(canvasInstance.freeDrawingBrush)
+      ;(canvasInstance.freeDrawingBrush as any).onMouseMove = function(pointer: any, options: any) {
+        const vpt = canvasInstance.viewportTransform
+        if (vpt) {
+          const invertedVPT = fabric.util.invertTransform(vpt)
+          const transformedPoint = fabric.util.transformPoint(pointer, invertedVPT)
+          return originalOnMouseMove(transformedPoint, options)
+        }
+        return originalOnMouseMove(pointer, options)
+      }
     }
 
     canvasInstance.forEachObject((object) => {
@@ -273,6 +296,8 @@ export const WhiteboardCanvas = ({
       targetFindTolerance: 4,
       // Optimize rendering performance
       stateful: false,
+      // Enable viewport transform for proper pan + drawing
+      viewportTransform: [1, 0, 0, 1, 0, 0],
     })
 
     // Optimize brush for tablet/stylus input with pressure sensitivity
@@ -288,6 +313,36 @@ export const WhiteboardCanvas = ({
       ;(fabricCanvas.freeDrawingBrush as any).limitedToCanvasSize = true
       // Reduce smoothing for more immediate response
       ;(fabricCanvas.freeDrawingBrush as any).strokeMiterLimit = 10
+      
+      // CRITICAL FIX: Patch brush to work with viewport transform (pan)
+      // Store original onMouseDown and override to handle viewport transform
+      const originalOnMouseDown = (fabricCanvas.freeDrawingBrush as any).onMouseDown.bind(fabricCanvas.freeDrawingBrush)
+      ;(fabricCanvas.freeDrawingBrush as any).onMouseDown = function(pointer: any, options: any) {
+        // Apply viewport transform inverse to get correct coordinates
+        const vpt = fabricCanvas.viewportTransform
+        if (vpt) {
+          const invertedVPT = fabric.util.invertTransform(vpt)
+          const transformedPoint = fabric.util.transformPoint(pointer, invertedVPT)
+          return originalOnMouseDown(transformedPoint, options)
+        }
+        return originalOnMouseDown(pointer, options)
+      }
+      
+      const originalOnMouseMove = (fabricCanvas.freeDrawingBrush as any).onMouseMove.bind(fabricCanvas.freeDrawingBrush)
+      ;(fabricCanvas.freeDrawingBrush as any).onMouseMove = function(pointer: any, options: any) {
+        const vpt = fabricCanvas.viewportTransform
+        if (vpt) {
+          const invertedVPT = fabric.util.invertTransform(vpt)
+          const transformedPoint = fabric.util.transformPoint(pointer, invertedVPT)
+          return originalOnMouseMove(transformedPoint, options)
+        }
+        return originalOnMouseMove(pointer, options)
+      }
+      
+      const originalOnMouseUp = (fabricCanvas.freeDrawingBrush as any).onMouseUp.bind(fabricCanvas.freeDrawingBrush)
+      ;(fabricCanvas.freeDrawingBrush as any).onMouseUp = function(options: any) {
+        return originalOnMouseUp(options)
+      }
     }
 
     fabricCanvas.setDimensions({
