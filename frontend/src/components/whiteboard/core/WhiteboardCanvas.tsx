@@ -393,9 +393,12 @@ export const WhiteboardCanvas = ({
           strokeLineCap: 'round',
           strokeLineJoin: 'round',
           selectable: true,
+          hasControls: false, // Hide transform controls
+          hasBorders: false, // Hide selection border/rectangle
         })
         
         canvas.add(fabricPath)
+        canvas.discardActiveObject() // Don't select the path after drawing
         canvas.requestRenderAll()
         emitSnapshot()
         saveToHistory()
