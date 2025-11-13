@@ -4,7 +4,6 @@ export type WhiteboardTool =
   | 'select'
   | 'pan'
   | 'pen'
-  | 'pen2'
   | 'eraser'
   | 'rectangle'
   | 'ellipse'
