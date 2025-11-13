@@ -212,7 +212,7 @@ export const WhiteboardCanvas = ({
       canvasInstance.freeDrawingBrush.width = strokeWidth
       
       if (isTabletPen) {
-        // ULTRA-OPTIMIZED settings for Tablet Pen (pen2) - FOR RAPID WRITING
+        // ULTRA-OPTIMIZED settings for Tablet Pen (pen2) - FOR RAPID WRITING ON HIGH-DPI
         ;(canvasInstance.freeDrawingBrush as any).decimate = 0 // Capture ALL points, no reduction
         ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
         ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
@@ -221,6 +221,35 @@ export const WhiteboardCanvas = ({
         // Additional tablet optimizations for speed
         ;(canvasInstance.freeDrawingBrush as any).strokeUniform = true
         ;(canvasInstance.freeDrawingBrush as any).shadow = null
+        
+        // CRITICAL FIX FOR HIGH-DPI: Override onMouseMove to process coalesced events
+        const brush = canvasInstance.freeDrawingBrush as any
+        const originalOnMouseMove = brush.onMouseMove.bind(brush)
+        
+        brush.onMouseMove = function(pointer: any, options: any) {
+          // Try to get coalesced events from the native event
+          const nativeEvent = options?.e
+          if (nativeEvent && nativeEvent.getCoalescedEvents) {
+            const coalescedEvents = nativeEvent.getCoalescedEvents()
+            
+            // If we have coalesced events, process each one
+            if (coalescedEvents && coalescedEvents.length > 1) {
+              coalescedEvents.forEach((event: PointerEvent, index: number) => {
+                // Get pointer position for each coalesced event
+                const coalescedPointer = canvasInstance.getPointer(event)
+                
+                // Call original onMouseMove for each intermediate point
+                if (coalescedPointer && index < coalescedEvents.length) {
+                  originalOnMouseMove(coalescedPointer, { e: event })
+                }
+              })
+              return
+            }
+          }
+          
+          // Fallback to normal behavior if no coalesced events
+          return originalOnMouseMove(pointer, options)
+        }
       } else {
         // Standard pen settings
         ;(canvasInstance.freeDrawingBrush as any).decimate = 0
@@ -277,7 +306,7 @@ export const WhiteboardCanvas = ({
       viewportTransform: [1, 0, 0, 1, 0, 0],
     })
 
-    // Optimize brush for tablet/stylus input with pressure sensitivity
+    // Optimize brush for tablet/stylus input with pressure sensitivity and high-DPI support
     fabricCanvas.freeDrawingBrush = new fabric.PencilBrush(fabricCanvas)
     if (fabricCanvas.freeDrawingBrush) {
       fabricCanvas.freeDrawingBrush.color = strokeColor
@@ -290,6 +319,29 @@ export const WhiteboardCanvas = ({
       ;(fabricCanvas.freeDrawingBrush as any).limitedToCanvasSize = false // Allow drawing anywhere
       // Reduce smoothing for more immediate response
       ;(fabricCanvas.freeDrawingBrush as any).strokeMiterLimit = 10
+      
+      // HIGH-DPI FIX: Process coalesced events for smooth rapid writing
+      const brush = fabricCanvas.freeDrawingBrush as any
+      const originalOnMouseMove = brush.onMouseMove.bind(brush)
+      
+      brush.onMouseMove = function(pointer: any, options: any) {
+        const nativeEvent = options?.e
+        if (nativeEvent && nativeEvent.getCoalescedEvents) {
+          const coalescedEvents = nativeEvent.getCoalescedEvents()
+          
+          if (coalescedEvents && coalescedEvents.length > 1) {
+            coalescedEvents.forEach((event: PointerEvent) => {
+              const coalescedPointer = fabricCanvas.getPointer(event)
+              if (coalescedPointer) {
+                originalOnMouseMove(coalescedPointer, { e: event })
+              }
+            })
+            return
+          }
+        }
+        
+        return originalOnMouseMove(pointer, options)
+      }
     }
 
     fabricCanvas.setDimensions({
@@ -339,7 +391,7 @@ export const WhiteboardCanvas = ({
     applyInteractionState(canvas)
   }, [canvas, activeTool, strokeColor, strokeWidth, fillColor])
 
-  // Separate useEffect for pressure sensitivity to avoid closure issues
+  // Separate useEffect for pressure sensitivity and high-DPI handling
   useEffect(() => {
     if (!canvas || !canvasElementRef.current) return
     
@@ -354,6 +406,26 @@ export const WhiteboardCanvas = ({
       const shouldProcess = isTabletPen ? true : e.pointerType === 'pen'
       
       if (shouldProcess && canvas.isDrawingMode && canvas.freeDrawingBrush) {
+        // For high-DPI tablets: process coalesced events to capture ALL intermediate points
+        if (isTabletPen && e.getCoalescedEvents) {
+          const events = e.getCoalescedEvents()
+          if (events.length > 0) {
+            // Process all coalesced events for smooth lines on high-DPI displays
+            events.forEach((coalescedEvent: PointerEvent) => {
+              const pressure = coalescedEvent.pressure || 0.5
+              const baseWidth = strokeWidth
+              const pressureWidth = Math.max(1, baseWidth * (0.3 + pressure * 1.0))
+              
+              // Update brush width for each intermediate point
+              if (canvas.freeDrawingBrush) {
+                canvas.freeDrawingBrush.width = pressureWidth
+              }
+            })
+            return
+          }
+        }
+        
+        // Fallback: process main event
         const pressure = e.pressure || 0.5
         const baseWidth = strokeWidth
         
