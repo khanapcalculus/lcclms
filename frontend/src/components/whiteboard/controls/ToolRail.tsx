@@ -1,6 +1,7 @@
 import { clsx } from 'clsx'
 import {
   Circle,
+  Edit3,
   Eraser,
   Hand,
   Images,
@@ -29,6 +30,7 @@ const TOOL_CONFIG: Array<{
   { id: 'pan', label: 'Pan', icon: Hand },
   { id: 'select', label: 'Select / Move', icon: Pointer },
   { id: 'pen', label: 'Pen', icon: PenTool },
+  { id: 'pen2', label: 'Tablet Pen (Optimized)', icon: Edit3 },
   { id: 'eraser', label: 'Eraser', icon: Eraser },
   { id: 'rectangle', label: 'Rectangle', icon: Square },
   { id: 'ellipse', label: 'Ellipse', icon: Circle },

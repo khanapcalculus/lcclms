@@ -189,13 +189,15 @@ export const WhiteboardCanvas = ({
   }, [canUndo, canRedo, onHistoryChange])
 
   const applyInteractionState = (canvasInstance: fabric.Canvas) => {
-    const isDrawing = activeTool === 'pen'
+    const isDrawing = activeTool === 'pen' || activeTool === 'pen2'
     const isPan = activeTool === 'pan'
+    const isTabletPen = activeTool === 'pen2'
+    
     canvasInstance.isDrawingMode = isDrawing
     canvasInstance.selection = activeTool === 'select'
     canvasInstance.skipTargetFind = isPan
     canvasInstance.defaultCursor =
-      activeTool === 'pen'
+      activeTool === 'pen' || activeTool === 'pen2'
         ? 'crosshair'
         : isPan
           ? 'grab'
@@ -206,12 +208,25 @@ export const WhiteboardCanvas = ({
     if (canvasInstance.freeDrawingBrush && isDrawing) {
       canvasInstance.freeDrawingBrush.color = strokeColor
       canvasInstance.freeDrawingBrush.width = strokeWidth
-      // Critical optimizations for smooth tablet drawing
-      ;(canvasInstance.freeDrawingBrush as any).decimate = 0
-      ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
-      ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
-      ;(canvasInstance.freeDrawingBrush as any).limitedToCanvasSize = true
-      ;(canvasInstance.freeDrawingBrush as any).strokeMiterLimit = 10
+      
+      if (isTabletPen) {
+        // ULTRA-OPTIMIZED settings for Tablet Pen (pen2)
+        ;(canvasInstance.freeDrawingBrush as any).decimate = 0 // No point reduction
+        ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
+        ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
+        ;(canvasInstance.freeDrawingBrush as any).limitedToCanvasSize = true
+        ;(canvasInstance.freeDrawingBrush as any).strokeMiterLimit = 10
+        // Additional tablet optimizations
+        ;(canvasInstance.freeDrawingBrush as any).strokeUniform = true
+        ;(canvasInstance.freeDrawingBrush as any).shadow = null // Remove shadows for better performance
+      } else {
+        // Standard pen settings
+        ;(canvasInstance.freeDrawingBrush as any).decimate = 0
+        ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
+        ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
+        ;(canvasInstance.freeDrawingBrush as any).limitedToCanvasSize = true
+        ;(canvasInstance.freeDrawingBrush as any).strokeMiterLimit = 10
+      }
     }
 
     canvasInstance.forEachObject((object) => {
@@ -298,15 +313,24 @@ export const WhiteboardCanvas = ({
     const canvasElement = canvasElementRef.current
     
     const handlePointerEvent = (e: PointerEvent) => {
-      // Only process stylus/pen events
+      // Process stylus/pen events - more aggressive for pen2 (tablet pen)
       if (e.pointerType === 'pen' && fabricCanvas.isDrawingMode) {
         const pressure = e.pressure || 0.5
+        const isTabletPen = activeTool === 'pen2'
         
         // Dynamically adjust stroke width based on pressure
         if (fabricCanvas.freeDrawingBrush) {
           const baseWidth = strokeWidth
-          const pressureWidth = Math.max(1, baseWidth * (0.5 + pressure * 0.8))
-          fabricCanvas.freeDrawingBrush.width = pressureWidth
+          
+          if (isTabletPen) {
+            // More responsive pressure curve for tablet pen
+            const pressureWidth = Math.max(1, baseWidth * (0.3 + pressure * 1.0))
+            fabricCanvas.freeDrawingBrush.width = pressureWidth
+          } else {
+            // Standard pressure curve for regular pen
+            const pressureWidth = Math.max(1, baseWidth * (0.5 + pressure * 0.8))
+            fabricCanvas.freeDrawingBrush.width = pressureWidth
+          }
         }
       }
     }
