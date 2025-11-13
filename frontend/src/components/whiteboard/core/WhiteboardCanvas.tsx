@@ -340,13 +340,16 @@ export const WhiteboardCanvas = ({
       nativePathPointsRef.current = []
       
       const rect = drawingCanvas.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
+      const screenX = e.clientX - rect.left
+      const screenY = e.clientY - rect.top
       
-      nativePathPointsRef.current.push({ x, y })
+      // Get Fabric.js canvas coordinates (accounts for pan/zoom)
+      const fabricPointer = canvas.getPointer(e)
+      
+      nativePathPointsRef.current.push({ x: fabricPointer.x, y: fabricPointer.y })
       
       ctx.beginPath()
-      ctx.moveTo(x, y)
+      ctx.moveTo(screenX, screenY)
       ctx.strokeStyle = strokeColor
       ctx.lineWidth = strokeWidth
       ctx.lineCap = 'round'
@@ -357,12 +360,15 @@ export const WhiteboardCanvas = ({
       if (!isNativeDrawingRef.current) return
       
       const rect = drawingCanvas.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
+      const screenX = e.clientX - rect.left
+      const screenY = e.clientY - rect.top
       
-      nativePathPointsRef.current.push({ x, y })
+      // Get Fabric.js canvas coordinates (accounts for pan/zoom)
+      const fabricPointer = canvas.getPointer(e)
       
-      ctx.lineTo(x, y)
+      nativePathPointsRef.current.push({ x: fabricPointer.x, y: fabricPointer.y })
+      
+      ctx.lineTo(screenX, screenY)
       ctx.stroke()
     }
     
@@ -372,6 +378,7 @@ export const WhiteboardCanvas = ({
       isNativeDrawingRef.current = false
       
       // Convert native canvas drawing to Fabric.js path
+      // Use the Fabric.js coordinates (already accounts for pan)
       const points = nativePathPointsRef.current
       if (points.length > 1) {
         let pathString = `M ${points[0].x} ${points[0].y}`

@@ -46,16 +46,27 @@ export const assignStudentsToTutor = async (tutorId: string, studentIds: string[
     throw new Error('One or more students were not found')
   }
 
+  // Add tutor to students' tutorIds array (support multiple tutors)
   await UserModel.updateMany(
     { _id: { $in: studentIds } },
     {
       $set: {
-        tutorId: tutor._id,
+        tutorId: tutor._id, // Keep primary tutor for backwards compatibility
+      },
+      $addToSet: {
+        tutorIds: tutor._id, // Add to array (no duplicates)
       },
     }
   )
 
-  tutor.assignedStudents = studentIds.map((id) => new Types.ObjectId(id))
+  // Add students to tutor's assignedStudents (merge, no duplicates)
+  const existingStudentIds = tutor.assignedStudents.map((id) => id.toString())
+  const newStudentIds = studentIds.filter((id) => !existingStudentIds.includes(id))
+  
+  tutor.assignedStudents = [
+    ...tutor.assignedStudents,
+    ...newStudentIds.map((id) => new Types.ObjectId(id)),
+  ]
   await tutor.save()
 
   return tutor.toObject()

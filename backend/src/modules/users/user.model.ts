@@ -8,7 +8,8 @@ export interface UserDocument extends Document {
   role: UserRole
   displayName: string
   avatarUrl?: string
-  tutorId?: Types.ObjectId
+  tutorId?: Types.ObjectId // Legacy - primary tutor
+  tutorIds: Types.ObjectId[] // New - support multiple tutors per student
   assignedStudents: Types.ObjectId[]
   createdAt: Date
   updatedAt: Date
@@ -48,6 +49,12 @@ const userSchema = new Schema<UserDocument>(
       ref: 'User',
       index: true,
     },
+    tutorIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     assignedStudents: [
       {
         type: Schema.Types.ObjectId,

@@ -32,14 +32,9 @@ export const AdminDashboard = () => {
   }, [])
 
   const availableStudents = useMemo(() => {
-    if (!selectedTutor) return students
-    const assigned = new Set(
-      tutors
-        .find((tutor) => tutor._id === selectedTutor)
-        ?.assignedStudents?.map((student) => student._id) ?? []
-    )
-    return students.filter((student) => !assigned.has(student._id))
-  }, [selectedTutor, students, tutors])
+    // Show ALL students - students can be assigned to multiple tutors
+    return students
+  }, [students])
 
   const handleCreateUser = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -205,7 +200,9 @@ export const AdminDashboard = () => {
             </select>
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-xs uppercase tracking-[0.25em]">Students</label>
+            <label className="text-xs uppercase tracking-[0.25em]">
+              Students (Hold Ctrl/Cmd to select multiple)
+            </label>
             <select
               multiple
               value={selectedStudents}
@@ -214,12 +211,21 @@ export const AdminDashboard = () => {
               }
               className="h-32 rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm focus:border-sky-400/70 focus:outline-none"
             >
-              {availableStudents.map((student) => (
-                <option key={student._id} value={student._id}>
-                  {student.displayName} ({student.email})
-                </option>
-              ))}
+              {availableStudents.map((student) => {
+                const isAlreadyAssigned = tutors
+                  .find((t) => t._id === selectedTutor)
+                  ?.assignedStudents?.some((s) => s._id === student._id)
+                return (
+                  <option key={student._id} value={student._id}>
+                    {student.displayName} ({student.email})
+                    {isAlreadyAssigned ? ' ✓' : ''}
+                  </option>
+                )
+              })}
             </select>
+            <p className="text-xs text-white/60">
+              Students with ✓ are already assigned to this tutor. You can still assign them again for different subjects.
+            </p>
           </div>
           <div className="md:col-span-2">
             <button
