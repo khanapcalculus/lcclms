@@ -35,7 +35,20 @@ export const useSessionPresence = (sessionId: string | undefined) => {
       },
     })
 
+    socketInstance.on('connect', () => {
+      console.log('[RTC] Socket connected:', socketInstance.id)
+    })
+
+    socketInstance.on('disconnect', (reason) => {
+      console.log('[RTC] Socket disconnected:', reason)
+    })
+
+    socketInstance.on('connect_error', (error) => {
+      console.error('[RTC] Socket connection error:', error)
+    })
+
     socketInstance.on('presence:update', (entries: PresenceEntry[]) => {
+      console.log('[RTC] Presence update:', entries.length, 'participants')
       setPresence(entries.sort((a, b) => a.joinedAt - b.joinedAt))
     })
 
@@ -62,6 +75,7 @@ export const useSessionPresence = (sessionId: string | undefined) => {
     () =>
       socket
         ? (payload: unknown) => {
+            console.log('[RTC] Emitting whiteboard operation:', payload)
             socket.emit('whiteboard:operation', payload)
           }
         : undefined,
@@ -99,7 +113,10 @@ export const useSessionPresence = (sessionId: string | undefined) => {
       if (!socket) {
         return () => {}
       }
-      const wrapped = (payload: { userId: string; state: unknown }) => handler(payload)
+      const wrapped = (payload: { userId: string; state: unknown }) => {
+        console.log('[RTC] Received whiteboard operation from:', payload.userId)
+        handler(payload)
+      }
       socket.on('whiteboard:operation', wrapped)
       return () => socket.off('whiteboard:operation', wrapped)
     },
