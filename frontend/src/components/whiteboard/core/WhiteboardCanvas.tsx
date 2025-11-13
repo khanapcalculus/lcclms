@@ -92,6 +92,12 @@ export const WhiteboardCanvas = ({
   const lastCursorEmitRef = useRef(0)
   const [remoteCursors, setRemoteCursors] = useState<Record<string, RemoteCursor>>({})
   
+  // Native canvas drawing for tablet pen
+  const drawingCanvasRef = useRef<HTMLCanvasElement>(null)
+  const drawingCtxRef = useRef<CanvasRenderingContext2D | null>(null)
+  const isNativeDrawingRef = useRef(false)
+  const nativePathPointsRef = useRef<Array<{x: number, y: number}>>([])
+  
   // Undo/Redo history
   const historyRef = useRef<CanvasSnapshot[]>([])
   const historyIndexRef = useRef(-1)
@@ -189,13 +195,15 @@ export const WhiteboardCanvas = ({
   }, [canUndo, canRedo, onHistoryChange])
 
   const applyInteractionState = (canvasInstance: fabric.Canvas) => {
-    const isDrawing = activeTool === 'pen'
     const isPan = activeTool === 'pan'
-    canvasInstance.isDrawingMode = isDrawing
+    const isOriginalPen = activeTool === 'pen'
+    
+    // Original pen uses Fabric.js, pen2 uses native canvas
+    canvasInstance.isDrawingMode = isOriginalPen
     canvasInstance.selection = activeTool === 'select'
     canvasInstance.skipTargetFind = isPan
     canvasInstance.defaultCursor =
-      activeTool === 'pen'
+      activeTool === 'pen' || activeTool === 'pen2'
         ? 'crosshair'
         : isPan
           ? 'grab'
@@ -203,13 +211,10 @@ export const WhiteboardCanvas = ({
             ? 'cell'
             : 'default'
 
-    if (canvasInstance.freeDrawingBrush && isDrawing) {
+    // Configure brush for original pen
+    if (canvasInstance.freeDrawingBrush && isOriginalPen) {
       canvasInstance.freeDrawingBrush.color = strokeColor
       canvasInstance.freeDrawingBrush.width = strokeWidth
-      // Optimize brush settings for tablet - immediate response
-      ;(canvasInstance.freeDrawingBrush as any).decimate = 0
-      ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
-      ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
     }
 
     canvasInstance.forEachObject((object) => {
@@ -308,6 +313,106 @@ export const WhiteboardCanvas = ({
     if (!canvas) return
     applyInteractionState(canvas)
   }, [canvas, activeTool, strokeColor, strokeWidth, fillColor])
+
+  // Native HTML Canvas drawing for pen2 (Tablet Pen) - SIMPLE and SMOOTH
+  useEffect(() => {
+    if (!drawingCanvasRef.current || !canvas) return
+    if (activeTool !== 'pen2') {
+      // Clear and hide drawing canvas when not using pen2
+      const ctx = drawingCtxRef.current
+      if (ctx) {
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+      }
+      return
+    }
+    
+    const drawingCanvas = drawingCanvasRef.current
+    const ctx = drawingCanvas.getContext('2d', { desynchronized: true })
+    if (!ctx) return
+    
+    drawingCtxRef.current = ctx
+    
+    // Disable Fabric.js drawing mode - we're using native canvas
+    canvas.isDrawingMode = false
+    
+    const handlePointerDown = (e: PointerEvent) => {
+      isNativeDrawingRef.current = true
+      nativePathPointsRef.current = []
+      
+      const rect = drawingCanvas.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      
+      nativePathPointsRef.current.push({ x, y })
+      
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      ctx.strokeStyle = strokeColor
+      ctx.lineWidth = strokeWidth
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+    }
+    
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isNativeDrawingRef.current) return
+      
+      const rect = drawingCanvas.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      
+      nativePathPointsRef.current.push({ x, y })
+      
+      ctx.lineTo(x, y)
+      ctx.stroke()
+    }
+    
+    const handlePointerUp = () => {
+      if (!isNativeDrawingRef.current) return
+      
+      isNativeDrawingRef.current = false
+      
+      // Convert native canvas drawing to Fabric.js path
+      const points = nativePathPointsRef.current
+      if (points.length > 1) {
+        let pathString = `M ${points[0].x} ${points[0].y}`
+        for (let i = 1; i < points.length; i++) {
+          pathString += ` L ${points[i].x} ${points[i].y}`
+        }
+        
+        const fabricPath = new fabric.Path(pathString, {
+          stroke: strokeColor,
+          strokeWidth: strokeWidth,
+          fill: '',
+          strokeLineCap: 'round',
+          strokeLineJoin: 'round',
+          selectable: true,
+        })
+        
+        canvas.add(fabricPath)
+        canvas.requestRenderAll()
+        emitSnapshot()
+        saveToHistory()
+      }
+      
+      // Clear the drawing canvas
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+      nativePathPointsRef.current = []
+    }
+    
+    drawingCanvas.addEventListener('pointerdown', handlePointerDown)
+    drawingCanvas.addEventListener('pointermove', handlePointerMove)
+    drawingCanvas.addEventListener('pointerup', handlePointerUp)
+    drawingCanvas.addEventListener('pointercancel', handlePointerUp)
+    drawingCanvas.addEventListener('pointerleave', handlePointerUp)
+    
+    return () => {
+      drawingCanvas.removeEventListener('pointerdown', handlePointerDown)
+      drawingCanvas.removeEventListener('pointermove', handlePointerMove)
+      drawingCanvas.removeEventListener('pointerup', handlePointerUp)
+      drawingCanvas.removeEventListener('pointercancel', handlePointerUp)
+      drawingCanvas.removeEventListener('pointerleave', handlePointerUp)
+    }
+  }, [canvas, activeTool, strokeColor, strokeWidth, emitSnapshot, saveToHistory])
 
   useEffect(() => {
     if (!canvas) return
@@ -754,6 +859,21 @@ export const WhiteboardCanvas = ({
           userSelect: 'none',
         }}
       />
+
+      {/* Native HTML Canvas for pen2 (Tablet Pen) - smooth drawing */}
+      {activeTool === 'pen2' && containerRef.current && (
+        <canvas
+          ref={drawingCanvasRef}
+          className="absolute inset-0 z-30"
+          width={containerRef.current.clientWidth}
+          height={containerRef.current.clientHeight}
+          style={{
+            pointerEvents: 'auto',
+            touchAction: 'none',
+            cursor: 'crosshair',
+          }}
+        />
+      )}
 
       <div className="pointer-events-none absolute inset-0 opacity-50 mix-blend-soft-light">
         <div

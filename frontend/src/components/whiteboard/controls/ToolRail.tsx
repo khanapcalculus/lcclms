@@ -1,11 +1,12 @@
 import { clsx } from 'clsx'
 import {
   Circle,
+  Edit3,
   Eraser,
   Hand,
   Images,
   Minus,
-  PenTool,
+  Pencil,
   Pointer,
   Square,
 } from 'lucide-react'
@@ -28,7 +29,8 @@ const TOOL_CONFIG: Array<{
 }> = [
   { id: 'pan', label: 'Pan', icon: Hand },
   { id: 'select', label: 'Select / Move', icon: Pointer },
-  { id: 'pen', label: 'Pen', icon: PenTool },
+  { id: 'pen', label: 'Pen', icon: Pencil },
+  { id: 'pen2', label: 'Tablet Pen', icon: Edit3 },
   { id: 'eraser', label: 'Eraser', icon: Eraser },
   { id: 'rectangle', label: 'Rectangle', icon: Square },
   { id: 'ellipse', label: 'Ellipse', icon: Circle },
@@ -76,13 +78,13 @@ export const ToolRail = ({
   return (
     <div
       className={clsx(
-        'flex items-center gap-4 rounded-[2rem]',
+        'flex items-center gap-2 rounded-[2rem]',
         isHorizontal
           ? 'flex-row bg-white/10 px-5 py-4 backdrop-blur-2xl'
           : 'w-20 shrink-0 flex-col justify-between bg-transparent p-4'
       )}
     >
-      <div className={clsx('flex gap-3', isHorizontal ? 'flex-row' : 'flex-col')}>
+      <div className={clsx('flex gap-1.5', isHorizontal ? 'flex-row' : 'flex-col')}>
         {TOOL_CONFIG.map((tool) => {
           const Icon = tool.icon
           return (
