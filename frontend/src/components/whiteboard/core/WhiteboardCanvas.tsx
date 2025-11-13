@@ -212,15 +212,15 @@ export const WhiteboardCanvas = ({
       canvasInstance.freeDrawingBrush.width = strokeWidth
       
       if (isTabletPen) {
-        // ULTRA-OPTIMIZED settings for Tablet Pen (pen2)
-        ;(canvasInstance.freeDrawingBrush as any).decimate = 0 // No point reduction
+        // ULTRA-OPTIMIZED settings for Tablet Pen (pen2) - FOR RAPID WRITING
+        ;(canvasInstance.freeDrawingBrush as any).decimate = 0 // Capture ALL points, no reduction
         ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
         ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
-        ;(canvasInstance.freeDrawingBrush as any).limitedToCanvasSize = false // Allow drawing anywhere
+        ;(canvasInstance.freeDrawingBrush as any).limitedToCanvasSize = false
         ;(canvasInstance.freeDrawingBrush as any).strokeMiterLimit = 10
-        // Additional tablet optimizations
+        // Additional tablet optimizations for speed
         ;(canvasInstance.freeDrawingBrush as any).strokeUniform = true
-        ;(canvasInstance.freeDrawingBrush as any).shadow = null // Remove shadows for better performance
+        ;(canvasInstance.freeDrawingBrush as any).shadow = null
       } else {
         // Standard pen settings
         ;(canvasInstance.freeDrawingBrush as any).decimate = 0
@@ -345,14 +345,16 @@ export const WhiteboardCanvas = ({
     
     const canvasElement = canvasElementRef.current
     const isDrawingTool = activeTool === 'pen' || activeTool === 'pen2'
+    const isTabletPen = activeTool === 'pen2'
     
     if (!isDrawingTool) return // Only add listeners when pen tool is active
     
     const handlePointerEvent = (e: PointerEvent) => {
-      // Process stylus/pen events - more aggressive for pen2 (tablet pen)
-      if (e.pointerType === 'pen' && canvas.isDrawingMode && canvas.freeDrawingBrush) {
+      // Process all pointer events for tablet pen, only stylus for regular pen
+      const shouldProcess = isTabletPen ? true : e.pointerType === 'pen'
+      
+      if (shouldProcess && canvas.isDrawingMode && canvas.freeDrawingBrush) {
         const pressure = e.pressure || 0.5
-        const isTabletPen = activeTool === 'pen2'
         const baseWidth = strokeWidth
         
         if (isTabletPen) {
@@ -367,12 +369,15 @@ export const WhiteboardCanvas = ({
       }
     }
     
-    canvasElement.addEventListener('pointermove', handlePointerEvent, { passive: true })
-    canvasElement.addEventListener('pointerdown', handlePointerEvent, { passive: true })
+    // For tablet pen, use non-passive to ensure no events are missed
+    const eventOptions = isTabletPen ? { passive: false, capture: true } : { passive: true }
+    
+    canvasElement.addEventListener('pointermove', handlePointerEvent, eventOptions)
+    canvasElement.addEventListener('pointerdown', handlePointerEvent, eventOptions)
     
     return () => {
-      canvasElement.removeEventListener('pointermove', handlePointerEvent)
-      canvasElement.removeEventListener('pointerdown', handlePointerEvent)
+      canvasElement.removeEventListener('pointermove', handlePointerEvent, eventOptions as any)
+      canvasElement.removeEventListener('pointerdown', handlePointerEvent, eventOptions as any)
     }
   }, [canvas, activeTool, strokeWidth])
 
@@ -598,29 +603,34 @@ export const WhiteboardCanvas = ({
       }, 500)
     }
 
-    // Optimize path creation for tablet - use requestAnimationFrame for smooth rendering
+    // Optimize path creation for tablet - use immediate rendering for pen2, RAF for pen
     const handlePathCreated = (event: fabric.IEvent & { path?: fabric.Path }) => {
-      // Cancel any pending render
-      if (renderFrameId !== null) {
-        cancelAnimationFrame(renderFrameId)
-      }
+      const isTabletPen = activeTool === 'pen2'
       
       // Optimize the created path for better performance
       const path = event.path
       if (path) {
         path.set({
-          objectCaching: true,
+          objectCaching: !isTabletPen, // Disable caching for tablet pen for faster rendering
           statefullCache: false,
           cacheProperties: [],
           dirty: true,
         })
       }
       
-      // Use requestAnimationFrame for smooth, optimized rendering
-      renderFrameId = requestAnimationFrame(() => {
+      if (isTabletPen) {
+        // IMMEDIATE rendering for tablet pen - no delays, no RAF cancellation
         canvas.requestRenderAll()
-        renderFrameId = null
-      })
+      } else {
+        // Standard pen uses RAF for smooth rendering
+        if (renderFrameId !== null) {
+          cancelAnimationFrame(renderFrameId)
+        }
+        renderFrameId = requestAnimationFrame(() => {
+          canvas.requestRenderAll()
+          renderFrameId = null
+        })
+      }
       
       // Broadcast after a delay
       broadcast()
