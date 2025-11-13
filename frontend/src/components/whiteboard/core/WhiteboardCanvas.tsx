@@ -92,6 +92,7 @@ export const WhiteboardCanvas = ({
   const lastCursorEmitRef = useRef(0)
   const [remoteCursors, setRemoteCursors] = useState<Record<string, RemoteCursor>>({})
   
+  
   // Undo/Redo history
   const historyRef = useRef<CanvasSnapshot[]>([])
   const historyIndexRef = useRef(-1)
@@ -206,26 +207,9 @@ export const WhiteboardCanvas = ({
 
     // Always recreate brush when switching to a pen tool to avoid stale state
     if (isDrawing) {
-      const isTabletPen = activeTool === 'pen2'
-      
       canvasInstance.freeDrawingBrush = new fabric.PencilBrush(canvasInstance)
       canvasInstance.freeDrawingBrush.color = strokeColor
       canvasInstance.freeDrawingBrush.width = strokeWidth
-      
-      if (isTabletPen) {
-        // TABLET PEN (pen2) - SUPER SIMPLE, NO OPTIMIZATIONS
-        // Just basic drawing, let Fabric.js do its default thing
-        ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
-        ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
-      } else {
-        // STANDARD PEN - Regular settings
-        ;(canvasInstance.freeDrawingBrush as any).decimate = 0
-        ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
-        ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
-        ;(canvasInstance.freeDrawingBrush as any).limitedToCanvasSize = false
-        ;(canvasInstance.freeDrawingBrush as any).strokeMiterLimit = 10
-        ;(canvasInstance.freeDrawingBrush as any).shadow = null
-      }
     }
 
     canvasInstance.forEachObject((object) => {
@@ -363,6 +347,7 @@ export const WhiteboardCanvas = ({
       canvasElement.removeEventListener('pointerdown', handlePointerEvent)
     }
   }, [canvas, activeTool, strokeWidth])
+
 
   useEffect(() => {
     if (!canvas) return
