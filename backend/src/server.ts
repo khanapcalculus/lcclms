@@ -21,7 +21,7 @@ const start = async () => {
 
   registerRtcGateway(io)
 
-  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost'
+  const host = '0.0.0.0' // Listen on all network interfaces for tablet access
   httpServer.listen(env.port, host, () => {
     console.info(`🚀 Server listening on ${host}:${env.port}`)
   })

@@ -206,17 +206,26 @@ export const WhiteboardCanvas = ({
 
     // Always recreate brush when switching to a pen tool to avoid stale state
     if (isDrawing) {
+      const isTabletPen = activeTool === 'pen2'
+      
       canvasInstance.freeDrawingBrush = new fabric.PencilBrush(canvasInstance)
       canvasInstance.freeDrawingBrush.color = strokeColor
       canvasInstance.freeDrawingBrush.width = strokeWidth
       
-      // SIMPLE, RELIABLE SETTINGS - Same for both pens, works on all devices
-      ;(canvasInstance.freeDrawingBrush as any).decimate = 0 // Capture all points
-      ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
-      ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
-      ;(canvasInstance.freeDrawingBrush as any).limitedToCanvasSize = false
-      ;(canvasInstance.freeDrawingBrush as any).strokeMiterLimit = 10
-      ;(canvasInstance.freeDrawingBrush as any).shadow = null // Remove shadows for performance
+      if (isTabletPen) {
+        // TABLET PEN (pen2) - SUPER SIMPLE, NO OPTIMIZATIONS
+        // Just basic drawing, let Fabric.js do its default thing
+        ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
+        ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
+      } else {
+        // STANDARD PEN - Regular settings
+        ;(canvasInstance.freeDrawingBrush as any).decimate = 0
+        ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
+        ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
+        ;(canvasInstance.freeDrawingBrush as any).limitedToCanvasSize = false
+        ;(canvasInstance.freeDrawingBrush as any).strokeMiterLimit = 10
+        ;(canvasInstance.freeDrawingBrush as any).shadow = null
+      }
     }
 
     canvasInstance.forEachObject((object) => {
@@ -327,27 +336,25 @@ export const WhiteboardCanvas = ({
     applyInteractionState(canvas)
   }, [canvas, activeTool, strokeColor, strokeWidth, fillColor])
 
-  // Simple pressure sensitivity for stylus input
+  // Pressure sensitivity - ONLY for standard pen, not for pen2
   useEffect(() => {
     if (!canvas || !canvasElementRef.current) return
     
     const canvasElement = canvasElementRef.current
-    const isDrawingTool = activeTool === 'pen' || activeTool === 'pen2'
+    const isStandardPen = activeTool === 'pen'
     
-    if (!isDrawingTool) return // Only add listeners when pen tool is active
+    if (!isStandardPen) return // Only for standard pen
     
     const handlePointerEvent = (e: PointerEvent) => {
       // Only process stylus/pen input with pressure
       if (e.pointerType === 'pen' && canvas.isDrawingMode && canvas.freeDrawingBrush) {
         const pressure = e.pressure || 0.5
         const baseWidth = strokeWidth
-        // Simple pressure curve that works for all devices
         const pressureWidth = Math.max(1, baseWidth * (0.5 + pressure * 0.7))
         canvas.freeDrawingBrush.width = pressureWidth
       }
     }
     
-    // Use passive listeners for smooth performance
     canvasElement.addEventListener('pointermove', handlePointerEvent, { passive: true })
     canvasElement.addEventListener('pointerdown', handlePointerEvent, { passive: true })
     
