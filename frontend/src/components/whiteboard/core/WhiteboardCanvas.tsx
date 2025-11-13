@@ -205,7 +205,9 @@ export const WhiteboardCanvas = ({
             ? 'cell'
             : 'default'
 
-    if (canvasInstance.freeDrawingBrush && isDrawing) {
+    // Always recreate brush when switching to a pen tool to avoid stale state
+    if (isDrawing) {
+      canvasInstance.freeDrawingBrush = new fabric.PencilBrush(canvasInstance)
       canvasInstance.freeDrawingBrush.color = strokeColor
       canvasInstance.freeDrawingBrush.width = strokeWidth
       
@@ -309,35 +311,6 @@ export const WhiteboardCanvas = ({
         })
     }
 
-    // Add pointer event listeners for pressure sensitivity (stylus/pen)
-    const canvasElement = canvasElementRef.current
-    
-    const handlePointerEvent = (e: PointerEvent) => {
-      // Process stylus/pen events - more aggressive for pen2 (tablet pen)
-      if (e.pointerType === 'pen' && fabricCanvas.isDrawingMode) {
-        const pressure = e.pressure || 0.5
-        const isTabletPen = activeTool === 'pen2'
-        
-        // Dynamically adjust stroke width based on pressure
-        if (fabricCanvas.freeDrawingBrush) {
-          const baseWidth = strokeWidth
-          
-          if (isTabletPen) {
-            // More responsive pressure curve for tablet pen
-            const pressureWidth = Math.max(1, baseWidth * (0.3 + pressure * 1.0))
-            fabricCanvas.freeDrawingBrush.width = pressureWidth
-          } else {
-            // Standard pressure curve for regular pen
-            const pressureWidth = Math.max(1, baseWidth * (0.5 + pressure * 0.8))
-            fabricCanvas.freeDrawingBrush.width = pressureWidth
-          }
-        }
-      }
-    }
-    
-    canvasElement.addEventListener('pointermove', handlePointerEvent, { passive: true })
-    canvasElement.addEventListener('pointerdown', handlePointerEvent, { passive: true })
-
     fabricCanvas.renderAll()
     setCanvas(fabricCanvas)
 
@@ -354,8 +327,6 @@ export const WhiteboardCanvas = ({
     resizeObserver.observe(containerRef.current)
 
     return () => {
-      canvasElement.removeEventListener('pointermove', handlePointerEvent)
-      canvasElement.removeEventListener('pointerdown', handlePointerEvent)
       resizeObserver.disconnect()
       fabricCanvas.dispose()
     }
@@ -365,6 +336,43 @@ export const WhiteboardCanvas = ({
     if (!canvas) return
     applyInteractionState(canvas)
   }, [canvas, activeTool, strokeColor, strokeWidth, fillColor])
+
+  // Separate useEffect for pressure sensitivity to avoid closure issues
+  useEffect(() => {
+    if (!canvas || !canvasElementRef.current) return
+    
+    const canvasElement = canvasElementRef.current
+    const isDrawingTool = activeTool === 'pen' || activeTool === 'pen2'
+    
+    if (!isDrawingTool) return // Only add listeners when pen tool is active
+    
+    const handlePointerEvent = (e: PointerEvent) => {
+      // Process stylus/pen events - more aggressive for pen2 (tablet pen)
+      if (e.pointerType === 'pen' && canvas.isDrawingMode && canvas.freeDrawingBrush) {
+        const pressure = e.pressure || 0.5
+        const isTabletPen = activeTool === 'pen2'
+        const baseWidth = strokeWidth
+        
+        if (isTabletPen) {
+          // More responsive pressure curve for tablet pen
+          const pressureWidth = Math.max(1, baseWidth * (0.3 + pressure * 1.0))
+          canvas.freeDrawingBrush.width = pressureWidth
+        } else {
+          // Standard pressure curve for regular pen
+          const pressureWidth = Math.max(1, baseWidth * (0.5 + pressure * 0.8))
+          canvas.freeDrawingBrush.width = pressureWidth
+        }
+      }
+    }
+    
+    canvasElement.addEventListener('pointermove', handlePointerEvent, { passive: true })
+    canvasElement.addEventListener('pointerdown', handlePointerEvent, { passive: true })
+    
+    return () => {
+      canvasElement.removeEventListener('pointermove', handlePointerEvent)
+      canvasElement.removeEventListener('pointerdown', handlePointerEvent)
+    }
+  }, [canvas, activeTool, strokeWidth])
 
   useEffect(() => {
     if (!canvas) return
