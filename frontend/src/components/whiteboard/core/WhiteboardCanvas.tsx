@@ -335,16 +335,28 @@ export const WhiteboardCanvas = ({
     // Disable Fabric.js drawing mode - we're using native canvas
     canvas.isDrawingMode = false
     
-    const handlePointerDown = (e: PointerEvent) => {
+    const handlePointerDown = (e: PointerEvent | MouseEvent | TouchEvent) => {
       isNativeDrawingRef.current = true
       nativePathPointsRef.current = []
       
       const rect = drawingCanvas.getBoundingClientRect()
-      const screenX = e.clientX - rect.left
-      const screenY = e.clientY - rect.top
+      let clientX: number, clientY: number
+      
+      if ('touches' in e && e.touches.length > 0) {
+        clientX = e.touches[0].clientX
+        clientY = e.touches[0].clientY
+      } else if ('clientX' in e) {
+        clientX = e.clientX
+        clientY = e.clientY
+      } else {
+        return
+      }
+      
+      const screenX = clientX - rect.left
+      const screenY = clientY - rect.top
       
       // Get Fabric.js canvas coordinates (accounts for pan/zoom)
-      const fabricPointer = canvas.getPointer(e)
+      const fabricPointer = canvas.getPointer(e as any)
       
       nativePathPointsRef.current.push({ x: fabricPointer.x, y: fabricPointer.y })
       
@@ -356,15 +368,27 @@ export const WhiteboardCanvas = ({
       ctx.lineJoin = 'round'
     }
     
-    const handlePointerMove = (e: PointerEvent) => {
+    const handlePointerMove = (e: PointerEvent | MouseEvent | TouchEvent) => {
       if (!isNativeDrawingRef.current) return
       
       const rect = drawingCanvas.getBoundingClientRect()
-      const screenX = e.clientX - rect.left
-      const screenY = e.clientY - rect.top
+      let clientX: number, clientY: number
+      
+      if ('touches' in e && e.touches.length > 0) {
+        clientX = e.touches[0].clientX
+        clientY = e.touches[0].clientY
+      } else if ('clientX' in e) {
+        clientX = e.clientX
+        clientY = e.clientY
+      } else {
+        return
+      }
+      
+      const screenX = clientX - rect.left
+      const screenY = clientY - rect.top
       
       // Get Fabric.js canvas coordinates (accounts for pan/zoom)
-      const fabricPointer = canvas.getPointer(e)
+      const fabricPointer = canvas.getPointer(e as any)
       
       nativePathPointsRef.current.push({ x: fabricPointer.x, y: fabricPointer.y })
       
@@ -409,11 +433,24 @@ export const WhiteboardCanvas = ({
       nativePathPointsRef.current = []
     }
     
+    // Add both pointer and mouse events for maximum compatibility
     drawingCanvas.addEventListener('pointerdown', handlePointerDown)
     drawingCanvas.addEventListener('pointermove', handlePointerMove)
     drawingCanvas.addEventListener('pointerup', handlePointerUp)
     drawingCanvas.addEventListener('pointercancel', handlePointerUp)
     drawingCanvas.addEventListener('pointerleave', handlePointerUp)
+    
+    // Fallback mouse events for devices that don't support pointer events
+    drawingCanvas.addEventListener('mousedown', handlePointerDown as any)
+    drawingCanvas.addEventListener('mousemove', handlePointerMove as any)
+    drawingCanvas.addEventListener('mouseup', handlePointerUp)
+    drawingCanvas.addEventListener('mouseleave', handlePointerUp)
+    
+    // Touch events for touch devices
+    drawingCanvas.addEventListener('touchstart', handlePointerDown as any)
+    drawingCanvas.addEventListener('touchmove', handlePointerMove as any)
+    drawingCanvas.addEventListener('touchend', handlePointerUp)
+    drawingCanvas.addEventListener('touchcancel', handlePointerUp)
     
     return () => {
       drawingCanvas.removeEventListener('pointerdown', handlePointerDown)
@@ -421,6 +458,16 @@ export const WhiteboardCanvas = ({
       drawingCanvas.removeEventListener('pointerup', handlePointerUp)
       drawingCanvas.removeEventListener('pointercancel', handlePointerUp)
       drawingCanvas.removeEventListener('pointerleave', handlePointerUp)
+      
+      drawingCanvas.removeEventListener('mousedown', handlePointerDown as any)
+      drawingCanvas.removeEventListener('mousemove', handlePointerMove as any)
+      drawingCanvas.removeEventListener('mouseup', handlePointerUp)
+      drawingCanvas.removeEventListener('mouseleave', handlePointerUp)
+      
+      drawingCanvas.removeEventListener('touchstart', handlePointerDown as any)
+      drawingCanvas.removeEventListener('touchmove', handlePointerMove as any)
+      drawingCanvas.removeEventListener('touchend', handlePointerUp)
+      drawingCanvas.removeEventListener('touchcancel', handlePointerUp)
     }
   }, [canvas, activeTool, strokeColor, strokeWidth, emitSnapshot, saveToHistory])
 
