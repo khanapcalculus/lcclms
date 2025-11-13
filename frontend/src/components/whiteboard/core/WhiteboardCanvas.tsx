@@ -206,6 +206,7 @@ export const WhiteboardCanvas = ({
             : 'default'
 
     // Always recreate brush when switching to a pen tool to avoid stale state
+    // SAME settings for both pens - identical to what works on computer/mobile
     if (isDrawing) {
       canvasInstance.freeDrawingBrush = new fabric.PencilBrush(canvasInstance)
       canvasInstance.freeDrawingBrush.color = strokeColor
