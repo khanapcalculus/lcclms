@@ -206,10 +206,12 @@ export const WhiteboardCanvas = ({
     if (canvasInstance.freeDrawingBrush && isDrawing) {
       canvasInstance.freeDrawingBrush.color = strokeColor
       canvasInstance.freeDrawingBrush.width = strokeWidth
-      // Optimize brush settings for tablet - immediate response
+      // Critical optimizations for smooth tablet drawing
       ;(canvasInstance.freeDrawingBrush as any).decimate = 0
       ;(canvasInstance.freeDrawingBrush as any).strokeLineCap = 'round'
       ;(canvasInstance.freeDrawingBrush as any).strokeLineJoin = 'round'
+      ;(canvasInstance.freeDrawingBrush as any).limitedToCanvasSize = true
+      ;(canvasInstance.freeDrawingBrush as any).strokeMiterLimit = 10
     }
 
     canvasInstance.forEachObject((object) => {
@@ -245,21 +247,30 @@ export const WhiteboardCanvas = ({
       preserveObjectStacking: true,
       enableRetinaScaling: true,
       renderOnAddRemove: false,
-      // Tablet/stylus optimizations
+      // Enhanced tablet/stylus optimizations
       enablePointerEvents: true,
       allowTouchScrolling: false,
       skipTargetFind: false,
+      // Critical for smooth tablet rendering
+      perPixelTargetFind: false,
+      targetFindTolerance: 4,
+      // Optimize rendering performance
+      stateful: false,
     })
 
-    // Optimize brush for tablet/stylus input
+    // Optimize brush for tablet/stylus input with pressure sensitivity
     fabricCanvas.freeDrawingBrush = new fabric.PencilBrush(fabricCanvas)
     if (fabricCanvas.freeDrawingBrush) {
       fabricCanvas.freeDrawingBrush.color = strokeColor
       fabricCanvas.freeDrawingBrush.width = strokeWidth
-      // Optimize for smooth tablet drawing - reduced smoothing for immediate response
+      // Critical optimizations for smooth tablet drawing
       ;(fabricCanvas.freeDrawingBrush as any).decimate = 0 // No decimation for smoother lines
       ;(fabricCanvas.freeDrawingBrush as any).strokeLineCap = 'round'
       ;(fabricCanvas.freeDrawingBrush as any).strokeLineJoin = 'round'
+      // Limit points for better performance without sacrificing quality
+      ;(fabricCanvas.freeDrawingBrush as any).limitedToCanvasSize = true
+      // Reduce smoothing for more immediate response
+      ;(fabricCanvas.freeDrawingBrush as any).strokeMiterLimit = 10
     }
 
     fabricCanvas.setDimensions({
@@ -283,6 +294,26 @@ export const WhiteboardCanvas = ({
         })
     }
 
+    // Add pointer event listeners for pressure sensitivity (stylus/pen)
+    const canvasElement = canvasElementRef.current
+    
+    const handlePointerEvent = (e: PointerEvent) => {
+      // Only process stylus/pen events
+      if (e.pointerType === 'pen' && fabricCanvas.isDrawingMode) {
+        const pressure = e.pressure || 0.5
+        
+        // Dynamically adjust stroke width based on pressure
+        if (fabricCanvas.freeDrawingBrush) {
+          const baseWidth = strokeWidth
+          const pressureWidth = Math.max(1, baseWidth * (0.5 + pressure * 0.8))
+          fabricCanvas.freeDrawingBrush.width = pressureWidth
+        }
+      }
+    }
+    
+    canvasElement.addEventListener('pointermove', handlePointerEvent, { passive: true })
+    canvasElement.addEventListener('pointerdown', handlePointerEvent, { passive: true })
+
     fabricCanvas.renderAll()
     setCanvas(fabricCanvas)
 
@@ -299,6 +330,8 @@ export const WhiteboardCanvas = ({
     resizeObserver.observe(containerRef.current)
 
     return () => {
+      canvasElement.removeEventListener('pointermove', handlePointerEvent)
+      canvasElement.removeEventListener('pointerdown', handlePointerEvent)
       resizeObserver.disconnect()
       fabricCanvas.dispose()
     }
@@ -503,6 +536,8 @@ export const WhiteboardCanvas = ({
 
     // Throttle broadcasts to improve performance during drawing
     let broadcastTimeout: ReturnType<typeof setTimeout> | null = null
+    let renderFrameId: number | null = null
+    
     const broadcast = () => {
       if (isApplyingRemoteRef.current) return
       
@@ -529,10 +564,30 @@ export const WhiteboardCanvas = ({
       }, 500)
     }
 
-    // Optimize path creation for tablet - render immediately but throttle broadcasts
-    const handlePathCreated = () => {
-      // Render immediately for smooth drawing
-      canvas.requestRenderAll()
+    // Optimize path creation for tablet - use requestAnimationFrame for smooth rendering
+    const handlePathCreated = (event: fabric.IEvent & { path?: fabric.Path }) => {
+      // Cancel any pending render
+      if (renderFrameId !== null) {
+        cancelAnimationFrame(renderFrameId)
+      }
+      
+      // Optimize the created path for better performance
+      const path = event.path
+      if (path) {
+        path.set({
+          objectCaching: true,
+          statefullCache: false,
+          cacheProperties: [],
+          dirty: true,
+        })
+      }
+      
+      // Use requestAnimationFrame for smooth, optimized rendering
+      renderFrameId = requestAnimationFrame(() => {
+        canvas.requestRenderAll()
+        renderFrameId = null
+      })
+      
       // Broadcast after a delay
       broadcast()
     }
@@ -545,6 +600,9 @@ export const WhiteboardCanvas = ({
     return () => {
       if (broadcastTimeout) {
         clearTimeout(broadcastTimeout)
+      }
+      if (renderFrameId !== null) {
+        cancelAnimationFrame(renderFrameId)
       }
       canvas.off('path:created', handlePathCreated)
       canvas.off('object:added', broadcast)
@@ -752,6 +810,14 @@ export const WhiteboardCanvas = ({
           WebkitTouchCallout: 'none',
           WebkitUserSelect: 'none',
           userSelect: 'none',
+          // GPU acceleration for smoother rendering
+          transform: 'translateZ(0)',
+          willChange: 'transform',
+          // Optimize for tablet pen input
+          msContentZooming: 'none' as any,
+          msTouchAction: 'none',
+          // Reduce latency
+          imageRendering: 'optimizeSpeed' as any,
         }}
       />
 
